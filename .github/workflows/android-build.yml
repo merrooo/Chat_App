@@ -20,6 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - uses: actions/setup-java@v4
         with:
@@ -29,7 +30,7 @@ jobs:
       - name: Verify structure
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          ls -la $ANDROID_HOME | head -5
+          ls -la "$ANDROID_HOME" | head -5
           echo "=== Chat folder ==="
           ls -la Chat/
           echo "=== android folder ==="
@@ -50,46 +51,4 @@ jobs:
           ls -la Chat/
 
       - name: Install npm deps
-        run: npm install --no-audit --no-fund
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
-      - name: Pin Gradle to 8.14.3
-        run: |
-          echo "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip" > android/gradle/wrapper/gradle-wrapper.properties
-
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-          ls -la android/app/release.keystore
-
-      - name: Build signed APK
-        working-directory: android
-        env:
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.keystore \
-            -Pandroid.injected.signing.store.password=$KS_PASS \
-            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$KEY_PASS
-
-      - name: Copy APK
-        run: |
-          mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/Chat-${GITHUB_REF_NAME}.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: APK
-          path: dist/Chat-${GITHUB_REF_NAME}.apk
-
-      - name: Publish Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/Chat-${GITHUB_REF_NAME}.apk
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
