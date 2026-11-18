@@ -8,11 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Vendored locally by the build (see workflow). Fallback CDN if local missing. -->
-  <script type="module" src="./assets/vendor/ionicons.esm.js"
-          onerror="this.onerror=null; var s=document.createElement('script'); s.type='module'; s.src='https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js'; document.head.appendChild(s);"></script>
-  <script nomodule src="./assets/vendor/ionicons.js"></script>
+  <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 
   <style>
     :root {
@@ -67,7 +64,6 @@
       overflow: hidden;
     }
 
-    /* Sidebar */
     .sidebar {
       width: 360px;
       max-width: 100%;
@@ -330,7 +326,6 @@
       background: rgba(239, 68, 68, 0.1);
     }
 
-    /* Main Chat Area */
     .chat-main {
       flex: 1;
       height: 100%;
@@ -537,7 +532,6 @@
       margin-top: 4px;
     }
 
-    /* Modal Styles */
     .confirm-overlay {
       position: absolute;
       inset: 0;
@@ -617,7 +611,6 @@
       color: var(--text-main);
     }
 
-    /* Name Lock Overlay */
     .name-lock-overlay {
       position: fixed;
       inset: 0;
@@ -674,7 +667,6 @@
     }
     .name-lock-box button:hover { background: var(--brand-dark); }
 
-    /* Emoji Picker Bar */
     .emoji-bar {
       display: grid;
       grid-template-columns: repeat(10, 1fr);
@@ -696,7 +688,6 @@
     }
     .emoji-bar button:hover { background: var(--bg-app); }
 
-    /* Input Footer */
     .chat-footer {
       padding: 10px 14px;
       background: var(--bg-panel);
@@ -753,7 +744,6 @@
       line-height: 1.4;
     }
 
-    /* Lightbox */
     .lightbox {
       position: fixed;
       inset: 0;
@@ -784,7 +774,6 @@
       cursor: pointer;
     }
 
-    /* Boot error overlay — visible if anything fails on device */
     #boot-error {
       display: none;
       position: fixed;
@@ -833,7 +822,6 @@
 </head>
 <body data-theme="light">
 
-  <!-- On-device error display -->
   <div id="boot-error"><button onclick="this.parentElement.style.display='none'">✕</button><pre id="boot-error-pre"></pre></div>
   <script>
     (function () {
@@ -845,11 +833,12 @@
       }
       window.__showBootError = show;
       window.addEventListener('error', function (e) {
-        if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
-          show('ASSET FAILED: ' + (e.target.src || e.target.href));
+        if (e.target && e.target !== window && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK' || e.target.tagName === 'IMG')) {
+          var url = e.target.src || e.target.href || '(no src)';
+          show('ASSET FAILED: ' + e.target.tagName + ' ' + url);
           return;
         }
-        show('ERROR: ' + (e.message || e.error || 'unknown') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || '?'));
+        show('ERROR: ' + (e.message || e.error || 'unknown') + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
       }, true);
       window.addEventListener('unhandledrejection', function (e) {
         var r = e.reason;
@@ -858,7 +847,6 @@
     })();
   </script>
 
-  <!-- Name Lock Modal -->
   <div class="name-lock-overlay hidden" id="name-lock-overlay">
     <div class="name-lock-box">
       <h3>مرحباً بك في نظام المحادثة</h3>
@@ -983,11 +971,11 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from "./assets/vendor/firebase-app.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {
       getDatabase, ref, set, update, get, onValue,
       onChildAdded, onChildRemoved, push, remove, onDisconnect
-    } from "./assets/vendor/firebase-database.js";
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAnKRhT5xJTBvsQKpW7e9w-hGSbAQJWTSo",
