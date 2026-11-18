@@ -15,14 +15,16 @@ jobs:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
@@ -31,24 +33,100 @@ jobs:
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
           ls -la "$ANDROID_HOME" | head -5
-          echo "=== Chat folder ==="
-          ls -la Chat/
+          echo "=== Repo root ==="
+          ls -la
+          echo "=== capacitor.config.json webDir ==="
+          node -e "const c=require('./capacitor.config.json'); console.log('webDir =', c.webDir)" || true
           echo "=== android folder ==="
           ls -la android/ | head -10
 
-      - name: Ensure Chat.html exists
+      - name: Ensure Capacitor webDir has index.html
         run: |
-          if [ ! -f Chat/index.html ]; then
-            if [ -f Chat/Chat.html ]; then
-              cp Chat/Chat.html Chat/index.html
-              echo "Copied Chat.html -> index.html"
-            else
-              echo "ERROR: no Chat.html or index.html in Chat/"
-              ls -la Chat/
-              exit 1
-            fi
-          fi
-          ls -la Chat/
+          WEB_DIR=$(node -e "const c=require('./capacitor.config.json'); process.stdout.write((c.webDir||'./www').replace(/^\.\//,''))")
+          echo "Resolved webDir: $WEB_DIR"
+          mkdir -p "$WEB_DIR"
 
+          if [ ! -f "$WEB_DIR/index.html" ]; then
+            for SRC in \
+              "$WEB_DIR/Chat.html" \
+              "Chat/Chat.html" \
+              "Chat_APP/Chat.html" \
+              "Chat/index.html" \
+              "Chat_App/Chat.html"; do
+              if [ -f "$SRC" ]; then
+                cp "$SRC" "$WEB_DIR/index.html"
+                echo "Copied $SRC -> $WEB_DIR/index.html"
+                break
+              fi
+            done
+          fi
+
+          if [ ! -f "$WEB_DIR/index.html" ]; then
+            echo "ERROR: could not create $WEB_DIR/index.html"
+            echo "--- html files found in repo ---"
+            find . -maxdepth 3 -type f \( -name 'Chat.html' -o -name 'index.html' \) -not -path '*/node_modules/*' | head -30
+            exit 1
+          fi
+          ls -la "$WEB_DIR"
+
+      # Must run AFTER webDir/index.html exists, because postinstall runs `cap sync`.
       - name: Install npm deps
-        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund
+
+      # Optional sanity check (postinstall already ran cap sync android).
+      - name: Verify Capacitor sync
+        run: npx cap sync android
+
+      - name: Pin Gradle to 8.14.3
+        run: |
+          WRAPPER=android/gradle/wrapper/gradle-wrapper.properties
+          if grep -q '^distributionUrl=' "$WRAPPER"; then
+            sed -i 's#^distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip#' "$WRAPPER"
+          else
+            echo 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.3-bin.zip' >> "$WRAPPER"
+          fi
+          grep '^distributionUrl=' "$WRAPPER"
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          ls -la android/app/release.keystore
+
+      - name: Build signed APK
+        working-directory: android
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace \
+            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/android/app/release.keystore" \
+            -Pandroid.injected.signing.store.password="$KS_PASS" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASS"
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f android/app/release.keystore
+
+      - name: Copy APK
+        run: |
+          mkdir -p dist
+          SAFE_REF="${GITHUB_REF_NAME//\//-}"
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/Chat-${SAFE_REF}.apk"
+          ls -la dist/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: APK
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Publish Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          fail_on_unmatched_files: true
