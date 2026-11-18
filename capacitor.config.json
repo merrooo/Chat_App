@@ -1,7 +1,7 @@
 {
     "appId": "com.merrooo.tvjcalibration",
-  "appName": "AEchat App",
-  "webDir": "AEchat",
+  "appName": "TVJ App",
+  "webDir": "TVJ",
   "bundledWebRuntime": false,
   "npmClient": "npm",
   "plugins": {
