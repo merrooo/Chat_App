@@ -1,25 +1,75 @@
-Reusable Capacitor Android setup and deployment (PowerShell)
-============================================================
+PowerShell guide: prepare, build, and release a Capacitor Android app
+=====================================================================
 
-This project uses app-setup.json as the configuration you edit for each app.
-The script updates Capacitor, Android app labels/ID/version, and the HTML entry
-file. Keep the existing Android namespace and MainActivity package unchanged.
+Follow these steps in order. app-setup.json is the file to edit when changing
+the app name, Android app ID, web folder, HTML entry file, or app version.
+Configure-App.ps1 applies those values to this existing Capacitor project.
+It does not create a native Android project from an arbitrary HTML folder.
 
-1. Put the web app in the project
----------------------------------
+Important:
+- Keep the Android namespace and MainActivity Java package unchanged.
+- For a new app, use a unique reverse-DNS appId. For an existing app, preserve
+  its appId exactly, including capitalization.
+- An update to an already-installed app must use the same appId and signing
+  key. Changing either prevents a normal in-place update.
+- Increase versionCode for every release update.
 
-From the project root, place the web folder and its HTML file together:
 
-    MyWeb\
-      Home.html
+STEP 1 - Open the project folder in PowerShell
+----------------------------------------------
+
+Open PowerShell and go to the folder containing package.json. For this
+repository:
+
+    Set-Location 'C:\Users\Admin\Desktop\Chat_APP'
+    Get-Location
+    Test-Path .\package.json
+    Test-Path .\android\gradlew.bat
+
+Expected:
+
+    Get-Location shows ...\Chat_APP
+    True
+    True
+
+If you copied the template to a different folder, change the Set-Location
+path to that copy. Do not delete the .git folder or run git init in an existing
+repository.
+
+
+STEP 2 - Put the web app in its web folder
+------------------------------------------
+
+Check the webDir value in app-setup.json first. The current project uses Chat.
+Put the HTML app and all of its supporting files in that folder. For example:
+
+    Chat\
+      index.html
       css\
       images\
+      scripts\
 
-Keep related CSS, JavaScript, and image files in the same web folder so relative
-paths continue to work.
+The HTML entry file may have another name; app-setup.json tells the setup
+script which file to use. Keep CSS, JavaScript, images, and other local files
+inside the web folder and preserve their relative paths.
 
-2. Edit app-setup.json
----------------------
+Check the configured entry file. For the current setup:
+
+    Test-Path .\Chat\index.html
+    Get-ChildItem .\Chat
+
+Expected:
+
+    True
+    The HTML file and its related folders/files are listed.
+
+
+STEP 3 - Set the app values in app-setup.json
+---------------------------------------------
+
+Open the one configuration file:
+
+    notepad .\app-setup.json
 
 Example:
 
@@ -32,78 +82,402 @@ Example:
       "versionName": "1.0.0"
     }
 
-Use a unique reverse-DNS appId. Keep the same appId and signing key for updates
-to an already-published app. A new appId installs as a separate Android app.
-Increase versionCode for each release update.
+Set each value as follows:
 
-3. Configure and sync in PowerShell
------------------------------------
+- appName: the name shown by Android and used in the APK filename.
+- appId: a unique reverse-DNS ID for a new app, such as com.example.myapp.
+  Do not change the existing appId when releasing an update to that app.
+- webDir: the web folder path relative to the project root.
+- entryHtml: the HTML filename directly inside webDir.
+- versionCode: a positive integer; increase it for every release update.
+- versionName: the human-readable version, such as 1.0.1.
 
-Open PowerShell in the repository root (the folder containing package.json),
-then run:
+Do not add a trailing slash to webDir. Save the file and close Notepad.
 
-    .\scripts\Configure-App.ps1
+
+STEP 4 - Configure the Capacitor and Android project
+----------------------------------------------------
+
+Run the setup script from the project root:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Configure-App.ps1
+
+Expected output resembles:
+
+    Configured My App (com.example.myapp)
+    Web entry: MyWeb\index.html
+    Version: 1.0.0 (1)
+    Next run: npm install; npx cap sync android
+
+The script copies entryHtml to index.html in webDir, and updates
+capacitor.config.json, android\app\build.gradle, AndroidManifest.xml, and
+strings.xml. It stops with an error if a required folder, HTML file, or
+Android project file is missing. Fix that error before continuing.
+
+The Android namespace and MainActivity package are intentionally not renamed.
+
+
+STEP 5 - Install the JavaScript dependencies
+--------------------------------------------
+
+From the project root, run:
+
     npm install --no-audit --no-fund
+
+Expected:
+
+    npm completes without an error and returns to the PowerShell prompt.
+
+This project runs a Capacitor Android sync during npm install. If npm reports
+an error, do not continue to a release build until it is resolved.
+
+
+STEP 6 - Sync and verify the Android web assets
+-----------------------------------------------
+
+Run an explicit sync:
+
     npx cap sync android
 
-The script copies MyWeb\Home.html to MyWeb\index.html and updates
-capacitor.config.json, android\app\build.gradle, AndroidManifest.xml, and
-strings.xml. It stops with an error if the folder, HTML file, or required
-Android files are missing.
+Expected output includes Capacitor copying the configured web assets and
+finishes without an error. Verify the generated entry files:
 
-4. Optional local debug install
--------------------------------
+    Test-Path .\Chat\index.html
+    Test-Path .\android\app\src\main\assets\public\index.html
 
-Local Android builds require JDK 21, the Android SDK, and (for installDebug)
-USB debugging enabled on a connected phone.
+Expected:
 
-    Set-Location android
+    True
+    True
+
+If you changed webDir from Chat, the first check should use the folder you set
+in app-setup.json. The second path is where Capacitor puts Android's web assets.
+
+
+STEP 7 - Optional local debug build and phone install
+-----------------------------------------------------
+
+Local Android builds need JDK 21 and the Android SDK. To install directly on a
+phone, enable Developer options and USB debugging, connect the phone, and
+confirm it is detected:
+
+    java -version
+    adb devices
+
+Expected:
+
+    Java reports version 21.
+    adb devices lists the connected phone as device.
+
+Build and install the debug app:
+
+    Push-Location .\android
     .\gradlew.bat installDebug
+    Pop-Location
 
-The debug APK is written to:
+Expected:
+
+    BUILD SUCCESSFUL
+    The debug app is installed on the connected phone.
+
+The debug APK is also written to:
 
     android\app\build\outputs\apk\debug\app-debug.apk
 
-5. Build a signed APK with GitHub Actions
------------------------------------------
+If JDK 21, Android SDK, or USB debugging is unavailable, skip this step and
+use GitHub Actions to build the APK.
 
-The workflow builds on a v* tag or when manually started from the Actions tab.
-Store the signing information as GitHub Actions repository secrets:
+
+STEP 8 - Check the installed app
+-------------------------------
+
+Open the app on the phone and check that:
+
+1. It starts and stays open.
+2. The expected app name is shown.
+3. The web page, images, buttons, and navigation work.
+4. Network-dependent features work when the phone is online.
+
+If it closes immediately, do not assume a release build will fix it. Capture
+the Android crash details before changing Firebase or native files.
+
+
+STEP 9 - Prepare or locate the Android signing key
+--------------------------------------------------
+
+The GitHub workflow needs the same signing key for every update of an existing
+app. First check whether a key already exists and whether it is tracked:
+
+    Test-Path .\release.keystore
+    git ls-files -- release.keystore android/app/release.keystore
+
+If the app has already been released, do not generate a replacement key.
+Locate the exact key and alias used to sign that release and keep using them.
+Without that same key, Android will not install the new APK as an update over
+the old app.
+
+Only for a genuinely new app with no prior installed/released version, create
+a key outside the repository. This example stores it in your Windows profile:
+
+    $KeyPath = Join-Path $HOME '.android\Chat_APP-release.keystore'
+    New-Item -ItemType Directory -Path (Split-Path $KeyPath) -Force
+    keytool -genkeypair -v -keystore $KeyPath -alias Chat_APP-key -keyalg RSA -keysize 2048 -validity 10000
+
+keytool prompts for the keystore password and certificate details. Enter the
+password interactively; do not put it in this file or in a command. Store the
+key, alias, and passwords in a secure password manager.
+
+Verify the key and alias:
+
+    keytool -list -v -keystore $KeyPath -alias Chat_APP-key
+
+Enter the password when prompted. Expected output includes the alias and
+"Entry type: PrivateKeyEntry".
+
+This repository previously tracked a release.keystore. A key that was pushed
+to a remote repository must be treated as exposed. Removing it from Git does
+not erase old copies or history. Do not blindly replace a key for an app that
+users already have installed; choose a signing-key migration plan first.
+
+
+STEP 10 - Copy the keystore as Base64 for a GitHub secret
+---------------------------------------------------------
+
+Set KeyPath to the actual existing or newly-created keystore. This example
+uses the new-key path from Step 9:
+
+    $KeyPath = Join-Path $HOME '.android\Chat_APP-release.keystore'
+    [Convert]::ToBase64String([IO.File]::ReadAllBytes($KeyPath)) | Set-Clipboard
+    if ([string]::IsNullOrWhiteSpace((Get-Clipboard -Raw))) { throw 'Clipboard is empty.' }
+    Write-Host 'Keystore Base64 copied. Paste it directly into the GitHub secret.'
+
+Expected:
+
+    Keystore Base64 copied. Paste it directly into the GitHub secret.
+
+The Base64 value is sensitive. Do not print it in PowerShell, paste it into
+this guide, or commit it to Git. Paste it directly into the GitHub secret in
+the next step.
+
+
+STEP 11 - Add the four GitHub Actions secrets
+---------------------------------------------
+
+Open the repository settings in your browser:
+
+    https://github.com/merrooo/Chat_App/settings/secrets/actions
+
+Choose "New repository secret" and add these names exactly as shown:
 
     ANDROID_KEYSTORE_BASE64
     ANDROID_KEYSTORE_PASSWORD
     ANDROID_KEY_ALIAS
     ANDROID_KEY_PASSWORD
 
-Do not put keystore passwords in this file, in PowerShell command history, or
-in the repository. Do not commit a .keystore or .jks file. Reuse the same
-signing key for updates to an existing app.
+For ANDROID_KEYSTORE_BASE64, paste the clipboard value from Step 10. For the
+other secrets, use the password(s) and alias belonging to this exact key.
+Never put these values in app-setup.json, this guide, source code, or a commit.
 
-After committing and pushing the configured app:
+Expected:
+
+    All four secrets appear by name in Repository secrets.
+    GitHub does not show their secret values again after saving.
+
+
+STEP 12 - Stop tracking local dependencies and keystore files
+-------------------------------------------------------------
+
+.gitignore prevents new matching files from being added, but it does not
+untrack files already committed. Check whether this repository tracks these
+paths:
+
+    git ls-files -- release.keystore android/app/release.keystore
+    git ls-files -- node_modules | Select-Object -First 10
+
+This repository has previously tracked release.keystore and node_modules. If
+the commands list them, remove them from Git's index while keeping local files:
+
+    git rm --cached -- release.keystore
+    git rm -r --cached -- node_modules
+
+If git ls-files showed android/app/release.keystore instead, use that exact
+path with git rm --cached. "git rm --cached" removes a file from Git tracking
+but leaves the local copy in place. Do not commit a keystore file.
+
+Expected:
+
+    The paths are staged for removal from the repository.
+    The local keystore (if present) and node_modules folder still exist.
+
+If a keystore was pushed previously, assume it is exposed even after removing
+it from the latest commit. Do not put its password in a new commit.
+
+
+STEP 13 - Verify the GitHub remote and current branch
+-----------------------------------------------------
+
+Check the repository connection:
+
+    git remote -v
+    git branch --show-current
+
+Expected remote:
+
+    origin  https://github.com/merrooo/Chat_App.git (fetch)
+    origin  https://github.com/merrooo/Chat_App.git (push)
+
+If origin is missing, add it:
+
+    git remote add origin https://github.com/merrooo/Chat_App.git
+
+If origin exists but points to the wrong repository, correct it:
+
+    git remote set-url origin https://github.com/merrooo/Chat_App.git
+
+Do not delete .git, reinitialize this repository, or force-push to fix a remote.
+
+
+STEP 14 - Review, stage, commit, and push the app
+-------------------------------------------------
+
+Review the changed files before staging:
 
     git status --short
-    git add .gitignore app-setup.json capacitor.config.json android .github scripts "deploy App in Git.txt"
-    git commit -m "Configure Android app"
+
+Stage only the files for this app. For the current Chat setup:
+
+    git add -- .gitignore app-setup.json capacitor.config.json .github\workflows\android-build.yml scripts\Configure-App.ps1 "deploy App in Git.txt" android Chat
+
+If webDir is not Chat, replace Chat in that command with the web folder you
+configured. Do not use "git add -A" before checking that node_modules,
+keystores, APKs, and other generated files are excluded.
+
+Inspect exactly what will be committed:
+
+    git diff --cached --check
+    git diff --cached --name-only
+    git status --short
+
+Expected:
+
+    git diff --cached --check prints no errors.
+    Intended app/config/workflow files are staged.
+    No keystore or node_modules files are staged as additions or modifications.
+
+If an unexpected secret or generated file is staged, stop and unstage that
+specific path before committing. Then commit and push the main branch:
+
+    git commit -m "Prepare Android app release"
     git push origin main
 
-Then open GitHub -> Actions -> Build & Release APK -> Run workflow, select
-main, and start the build. Alternatively, push a new version tag, for example:
+Expected:
 
-    git tag v1.0.1
-    git push origin v1.0.1
+    The commit succeeds and Git pushes main to origin.
 
-Download the APK from that successful workflow run's APK artifact. The APK
-filename uses appName from app-setup.json.
+Do not force-push. If Git reports a branch conflict or rejection, stop and
+resolve the actual Git history issue instead of overwriting the remote.
 
-Important repository safety notes
-----------------------------------
 
-Never delete .git, reinitialize this existing repository, force-push, or
-delete/recreate a release tag to redeploy. Use a new version tag or run the
-workflow manually.
+STEP 15 - Start the signed GitHub Actions release build
+-------------------------------------------------------
 
-This repository currently has release.keystore and node_modules tracked by Git.
-The root .gitignore prevents newly-added files from being staged, but it does
-not untrack files already committed. Check git status and the staged diff
-before every push. Treat any keystore already pushed to a remote repository as
-exposed; use a separately managed signing key for future releases.
+The workflow runs when a tag beginning with v is pushed, or when started
+manually from the Actions tab. For a tagged release, check that the tag name is
+not already in use:
+
+    git tag --list v1.0.0
+    git ls-remote --tags origin refs/tags/v1.0.0
+
+If neither command shows v1.0.0, create and push it:
+
+    git tag v1.0.0
+    git push origin v1.0.0
+
+Use the versionName from app-setup.json for the tag. If that tag already
+exists, increase the version and use a new tag; never delete and recreate a
+published release tag just to rerun a build.
+
+Alternatively, open:
+
+    https://github.com/merrooo/Chat_App/actions
+
+Choose "Build & Release APK", click "Run workflow", select main, and start it.
+A manually-started run uploads an APK artifact; a pushed v* tag also creates
+a GitHub Release.
+
+
+STEP 16 - Watch and verify the workflow
+---------------------------------------
+
+In the Actions tab, open the new run. Status indicators:
+
+    Yellow dot / queued or running = still working
+    Green check = succeeded
+    Red cross = failed; open the failed step and read its log
+
+The current workflow should run these steps:
+
+    Verify structure
+    Ensure webDir has index.html
+    Install npm dependencies
+    Sync Capacitor
+    Verify Android web assets
+    Decode keystore
+    Build signed APK
+    Remove temporary keystore
+    Copy APK
+    Upload APK artifact
+    Publish Release (tag builds only)
+
+Expected:
+
+    The run is green and has an APK artifact named APK.
+    A tag-triggered run also has a GitHub Release with the APK attached.
+
+If the run fails, use the first failed step's log to diagnose it. Do not
+recreate tags or replace the signing key as a first troubleshooting step.
+
+
+STEP 17 - Download and install the APK
+--------------------------------------
+
+For any successful run, open the run's Summary and download the artifact named
+APK. For a tag-triggered run, you can also download the APK from the GitHub
+Release page:
+
+    https://github.com/merrooo/Chat_App/releases
+
+The APK filename is based on appName and the tag or workflow run ref, for
+example:
+
+    Chat_APP-v1.0.0.apk
+
+Transfer the APK to the phone, tap it, allow installation from that source if
+Android asks, and tap Install. If Android refuses an update, confirm the
+installed app has the same appId and was signed with the same key.
+
+
+STEP 18 - Release a future update
+---------------------------------
+
+For every update to the same app:
+
+1. Edit app-setup.json. Keep appId unchanged; increase versionCode and set the
+   new versionName.
+2. Put the updated web app in webDir.
+3. Run the configure, install, and sync commands:
+
+       powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Configure-App.ps1
+       npm install --no-audit --no-fund
+       npx cap sync android
+
+4. Review and commit the intended changes as in Step 14, then push main.
+5. Create and push a new tag matching versionName. For example:
+
+       git tag v1.0.1
+       git push origin v1.0.1
+
+6. Watch the new Actions run as in Step 16 and download the APK as in Step 17.
+
+Always use a new tag for each release. Keep the same appId and signing key
+when users need to install the new APK as an update.

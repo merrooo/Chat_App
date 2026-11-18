@@ -34,7 +34,7 @@ if ([string]::IsNullOrWhiteSpace([string]$setup.webDir) -or
 }
 if ([System.IO.Path]::IsPathRooted([string]$setup.entryHtml) -or
     [System.IO.Path]::GetFileName([string]$setup.entryHtml) -ne [string]$setup.entryHtml -or
-    [System.IO.Path]::GetExtension([string]$setup.entryHtml) -notmatch '^\.(html?|HTML?)$') {
+    [System.IO.Path]::GetExtension([string]$setup.entryHtml) -notmatch '(?i)^\.(html?)$') {
     throw 'entryHtml must be an .html or .htm file name located directly inside webDir.'
 }
 $versionCode = 0
