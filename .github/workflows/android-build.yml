@@ -30,24 +30,24 @@ jobs:
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
           ls -la $ANDROID_HOME | head -5
-          echo "=== TVJ folder ==="
-          ls -la TVJ/
+          echo "=== Chat folder ==="
+          ls -la Chat/
           echo "=== android folder ==="
           ls -la android/ | head -10
 
-      - name: Ensure index.html exists
+      - name: Ensure Chat.html exists
         run: |
-          if [ ! -f TVJ/index.html ]; then
-            if [ -f TVJ/TVJ.html ]; then
-              cp TVJ/TVJ.html TVJ/index.html
-              echo "Copied TVJ.html -> index.html"
+          if [ ! -f Chat/index.html ]; then
+            if [ -f Chat/Chat.html ]; then
+              cp Chat/Chat.html Chat/index.html
+              echo "Copied Chat.html -> index.html"
             else
-              echo "ERROR: no TVJ.html or index.html in TVJ/"
-              ls -la TVJ/
+              echo "ERROR: no Chat.html or index.html in Chat/"
+              ls -la Chat/
               exit 1
             fi
           fi
-          ls -la TVJ/
+          ls -la Chat/
 
       - name: Install npm deps
         run: npm install --no-audit --no-fund

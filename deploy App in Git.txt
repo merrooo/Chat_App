@@ -133,7 +133,7 @@ origin  https://github.com/merrooo/Chat_App.git (push)
 
 STEP 10 — Copy keystore Base64
 
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\Admin\Desktop\Chat_APP\release.keystore")) | Set-Clipboard
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\Admin\Desktop\Chat_App\release.keystore")) | Set-Clipboard
 
 
 Expected output:
@@ -199,7 +199,7 @@ git push origin v1.0.0
 
 STEP 15 — Watch the build
 
-Browser: https://github.com/merrooo/Chat_App-AE/actions
+Browser: https://github.com/merrooo/Chat_App/actions
 
 
 
