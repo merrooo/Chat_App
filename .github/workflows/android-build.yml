@@ -93,8 +93,7 @@ jobs:
           mkdir -p dist
           APP_NAME="$(node -e "process.stdout.write(require('./capacitor.config.json').appName)")"
           SAFE_NAME="$(printf '%s' "$APP_NAME" | tr -cs 'A-Za-z0-9._-' '-')"
-          SAFE_REF="${GITHUB_REF_NAME//\//-}"
-          cp android/app/build/outputs/apk/release/app-release.apk "dist/${SAFE_NAME}-${SAFE_REF}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/${SAFE_NAME}.apk"
           ls -la dist/
 
       - name: Upload APK artifact

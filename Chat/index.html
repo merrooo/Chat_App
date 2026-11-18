@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AEChatting</title>
+  <title>AEChat</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -352,6 +352,32 @@
       width: 42px; height: 42px; border-radius: 50%; border: none;
       background: rgba(255,255,255,0.2); color: #fff; font-size: 24px; cursor: pointer;
     }
+    .message-notice {
+      position: fixed; top: calc(env(safe-area-inset-top) + 10px);
+      left: 12px; right: 12px; z-index: 9997; max-width: 460px; margin: 0 auto;
+      display: flex; align-items: center; gap: 12px; padding: 12px;
+      border: 1px solid var(--border); border-radius: 16px;
+      background: var(--bg-panel); color: var(--text-main);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.22); text-align: right;
+      cursor: pointer; opacity: 0; transform: translateY(-130%);
+      pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .message-notice.show {
+      opacity: 1; transform: translateY(0); pointer-events: auto;
+    }
+    .message-notice-avatar {
+      width: 42px; height: 42px; flex: 0 0 42px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+      color: #fff; font-weight: 800;
+    }
+    .message-notice-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+    .message-notice-title, .message-notice-body {
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
+    .message-notice-title { font-size: 0.85rem; font-weight: 800; }
+    .message-notice-body { font-size: 0.78rem; color: var(--text-muted); }
+    .message-notice-time { align-self: flex-start; font-size: 0.68rem; color: var(--text-muted); }
 
     #boot-error {
       display: none; position: fixed; inset: 0; z-index: 2147483647;
@@ -505,6 +531,15 @@
       </div>
     </main>
   </div>
+
+  <button class="message-notice" id="message-notice" type="button" aria-live="polite" aria-hidden="true">
+    <span class="message-notice-avatar" id="message-notice-avatar"></span>
+    <span class="message-notice-copy">
+      <span class="message-notice-title" id="message-notice-title"></span>
+      <span class="message-notice-body" id="message-notice-body"></span>
+    </span>
+    <span class="message-notice-time">الآن</span>
+  </button>
 
   <div class="confirm-overlay hidden" id="confirm-overlay">
     <div class="confirm-box">
@@ -821,12 +856,64 @@
     }
 
     const watchedRooms = new Set();
+    let messageNoticeTimer = null;
+
+    function showIncomingMessage(targetId, type, message) {
+      if (document.visibilityState !== 'visible' ||
+          (activeTargetId === targetId && activeType === type)) return;
+
+      const notice = $('message-notice');
+      const group = type === 'group' ? myGroups[targetId] : null;
+      const contact = type === 'user'
+        ? (savedContacts[targetId] || allUsersDirectory[targetId])
+        : null;
+      const senderName = String(message.senderName || (contact && contact.name) || 'مستخدم');
+      const title = group ? `${senderName} · ${group.name || 'مجموعة'}` : senderName;
+      let preview = String(message.text || '').trim();
+      if (!preview) {
+        if (message.mediaType === 'image') preview = 'صورة';
+        else if (message.mediaType === 'video') preview = 'فيديو';
+        else preview = message.fileName || 'رسالة جديدة';
+      }
+
+      $('message-notice-avatar').textContent = senderName.charAt(0) || '؟';
+      $('message-notice-title').textContent = title;
+      $('message-notice-body').textContent = preview;
+      notice.setAttribute('aria-hidden', 'false');
+      notice.classList.add('show');
+      clearTimeout(messageNoticeTimer);
+      messageNoticeTimer = setTimeout(() => {
+        notice.classList.remove('show');
+        notice.setAttribute('aria-hidden', 'true');
+      }, 5000);
+      notice.onclick = () => {
+        clearTimeout(messageNoticeTimer);
+        notice.classList.remove('show');
+        notice.setAttribute('aria-hidden', 'true');
+        const target = type === 'group'
+          ? myGroups[targetId]
+          : (savedContacts[targetId] || allUsersDirectory[targetId]);
+        if (target) openConversation({ ...target, id: targetId }, type);
+      };
+    }
+
     function attachUnreadWatcher(targetId, type) {
       const roomId = type === 'user' ? getRoomId(CLIENT_ID, targetId) : targetId;
       if (watchedRooms.has(roomId)) return;
       watchedRooms.add(roomId);
+      const seenMessageKeys = new Set();
+      let firstSnapshot = true;
       onValue(ref(db, `chat/messages/${roomId}`), (snap) => {
         const msgs = snap.val() || {};
+        Object.entries(msgs).forEach(([key, message]) => {
+          if (firstSnapshot) {
+            seenMessageKeys.add(key);
+          } else if (!seenMessageKeys.has(key)) {
+            seenMessageKeys.add(key);
+            if (message.sender !== CLIENT_ID) showIncomingMessage(targetId, type, message);
+          }
+        });
+        firstSnapshot = false;
         const lastRead = parseInt(localStorage.getItem(`read_${CLIENT_ID}_${targetId}`) || '0', 10);
         let unread = 0, latestTs = 0;
         Object.values(msgs).forEach(m => {
