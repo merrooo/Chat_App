@@ -48,12 +48,12 @@ jobs:
           fi
           echo "OK: $(wc -c < "$WEB_DIR/index.html") bytes"
 
-      # postinstall runs `cap sync` — index.html must exist by now.
+      # postinstall syncs through the Capacitor JS entry point; index.html must exist by now.
       - name: Install npm deps
         run: npm install --no-audit --no-fund
 
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: npm run sync:android
 
       - name: Verify web assets synced into android/
         run: |

@@ -152,4 +152,4 @@ $manifest.Save($manifestPath)
 Write-Host "Configured $($setup.appName) ($($setup.appId))"
 Write-Host "Web entry: $($setup.webDir)\index.html"
 Write-Host "Version: $($setup.versionName) ($($setup.versionCode))"
-Write-Host 'Next run: npm install; npx cap sync android'
+Write-Host 'Next run: npm install; npm run sync:android'

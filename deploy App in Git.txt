@@ -107,7 +107,7 @@ Expected output resembles:
     Configured My App (com.example.myapp)
     Web entry: MyWeb\index.html
     Version: 1.0.0 (1)
-    Next run: npm install; npx cap sync android
+    Next run: npm install; npm run sync:android
 
 The script copies entryHtml to index.html in webDir, and updates
 capacitor.config.json, android\app\build.gradle, AndroidManifest.xml, and
@@ -137,7 +137,7 @@ STEP 6 - Sync and verify the Android web assets
 
 Run an explicit sync:
 
-    npx cap sync android
+    npm run sync:android
 
 Expected output includes Capacitor copying the configured web assets and
 finishes without an error. Verify the generated entry files:
@@ -469,7 +469,7 @@ For every update to the same app:
 
        powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Configure-App.ps1
        npm install --no-audit --no-fund
-       npx cap sync android
+       npm run sync:android
 
 4. Review and commit the intended changes as in Step 14, then push main.
 5. Create and push a new tag matching versionName. For example:
