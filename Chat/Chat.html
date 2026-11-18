@@ -8,8 +8,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
-  <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+
+  <!-- Vendored locally by the build (see workflow). Fallback CDN if local missing. -->
+  <script type="module" src="./assets/vendor/ionicons.esm.js"
+          onerror="this.onerror=null; var s=document.createElement('script'); s.type='module'; s.src='https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js'; document.head.appendChild(s);"></script>
+  <script nomodule src="./assets/vendor/ionicons.js"></script>
 
   <style>
     :root {
@@ -114,9 +117,7 @@
       cursor: pointer;
       font-size: 18px;
     }
-    .header-icon-btn:hover {
-      background: rgba(255, 255, 255, 0.35);
-    }
+    .header-icon-btn:hover { background: rgba(255, 255, 255, 0.35); }
 
     .online-badge {
       background: rgba(255, 255, 255, 0.22);
@@ -162,11 +163,7 @@
       flex-shrink: 0;
       border: 2px solid var(--brand);
     }
-    .my-avatar-wrapper img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    .my-avatar-wrapper img { width: 100%; height: 100%; object-fit: cover; }
 
     .profile-box input {
       flex: 1;
@@ -179,6 +176,15 @@
       background: var(--bg-panel);
       color: var(--text-main);
     }
+
+    .save-tick {
+      color: var(--brand);
+      font-weight: 900;
+      font-size: 1rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .save-tick.show { opacity: 1; }
 
     .search-box {
       padding: 8px 14px;
@@ -232,11 +238,7 @@
     .avatar.group-avatar {
       background: linear-gradient(135deg, #8b5cf6, #6d28d9);
     }
-    .avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
     .avatar .dot-online {
       position: absolute;
       bottom: 1px;
@@ -410,10 +412,7 @@
       gap: 4px;
     }
     .batch-delete-btn.show { display: flex; }
-    .batch-delete-btn:hover {
-      background: var(--danger);
-      color: #fff;
-    }
+    .batch-delete-btn:hover { background: var(--danger); color: #fff; }
 
     .group-settings-btn {
       background: rgba(139, 92, 246, 0.1);
@@ -612,9 +611,7 @@
       background: var(--brand);
       color: #fff;
     }
-    .confirm-btn.yes.danger {
-      background: var(--danger);
-    }
+    .confirm-btn.yes.danger { background: var(--danger); }
     .confirm-btn.no {
       background: var(--border);
       color: var(--text-main);
@@ -675,9 +672,7 @@
       font-weight: 700;
       cursor: pointer;
     }
-    .name-lock-box button:hover {
-      background: var(--brand-dark);
-    }
+    .name-lock-box button:hover { background: var(--brand-dark); }
 
     /* Emoji Picker Bar */
     .emoji-bar {
@@ -725,10 +720,7 @@
       justify-content: center;
       flex-shrink: 0;
     }
-    .icon-btn:hover {
-      color: var(--brand);
-      border-color: var(--brand);
-    }
+    .icon-btn:hover { color: var(--brand); border-color: var(--brand); }
     .send-btn {
       width: 42px;
       height: 40px;
@@ -792,6 +784,36 @@
       cursor: pointer;
     }
 
+    /* Boot error overlay — visible if anything fails on device */
+    #boot-error {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      background: #7f1d1d;
+      color: #fff;
+      padding: 20px;
+      overflow: auto;
+      font-size: 13px;
+      direction: ltr;
+      text-align: left;
+      font-family: monospace;
+    }
+    #boot-error button {
+      position: sticky;
+      top: 0;
+      float: right;
+      background: #fff;
+      color: #7f1d1d;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    #boot-error pre { white-space: pre-wrap; margin: 0; }
+
     @media (max-width: 768px) {
       .sidebar {
         width: 100%;
@@ -803,21 +825,40 @@
         transform: translateX(100%);
         pointer-events: none;
       }
-      .chat-main {
-        width: 100%;
-      }
-      .back-btn {
-        display: flex;
-      }
-      .msg-bubble {
-        max-width: 85%;
-      }
+      .chat-main { width: 100%; }
+      .back-btn { display: flex; }
+      .msg-bubble { max-width: 85%; }
     }
   </style>
 </head>
 <body data-theme="light">
 
-  <!-- Name Lock Modal (Forced setup before app loads) -->
+  <!-- On-device error display -->
+  <div id="boot-error"><button onclick="this.parentElement.style.display='none'">✕</button><pre id="boot-error-pre"></pre></div>
+  <script>
+    (function () {
+      var box = document.getElementById('boot-error');
+      var pre = document.getElementById('boot-error-pre');
+      function show(msg) {
+        box.style.display = 'block';
+        pre.textContent += '[' + new Date().toISOString() + '] ' + msg + '\n\n';
+      }
+      window.__showBootError = show;
+      window.addEventListener('error', function (e) {
+        if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+          show('ASSET FAILED: ' + (e.target.src || e.target.href));
+          return;
+        }
+        show('ERROR: ' + (e.message || e.error || 'unknown') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || '?'));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        show('REJECTION: ' + (r && (r.stack || r.message) || r || 'unknown'));
+      });
+    })();
+  </script>
+
+  <!-- Name Lock Modal -->
   <div class="name-lock-overlay hidden" id="name-lock-overlay">
     <div class="name-lock-box">
       <h3>مرحباً بك في نظام المحادثة</h3>
@@ -828,7 +869,6 @@
   </div>
 
   <div class="app-container">
-    <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <h2><ion-icon name="chatbubbles"></ion-icon> المحادثات</h2>
@@ -861,7 +901,6 @@
       </div>
     </aside>
 
-    <!-- Main Chat Area -->
     <main class="chat-main" id="chat-main">
       <div class="empty-screen" id="welcome-screen">
         <ion-icon name="chatbubbles-outline"></ion-icon>
@@ -881,7 +920,6 @@
               <span id="active-sub">متصل</span>
             </div>
           </div>
-          
           <div class="chat-actions-group">
             <button class="group-settings-btn" id="group-settings-btn" title="إدارة أعضاء المجموعة">
               <ion-icon name="settings-outline"></ion-icon> الأعضاء
@@ -896,7 +934,6 @@
         </header>
 
         <div class="messages-area" id="messages-area"></div>
-
         <div class="emoji-bar hidden" id="emoji-bar"></div>
 
         <footer class="chat-footer">
@@ -914,7 +951,6 @@
     </main>
   </div>
 
-  <!-- Custom Confirmation Modal -->
   <div class="confirm-overlay hidden" id="confirm-overlay">
     <div class="confirm-box">
       <h4 id="confirm-text">تأكيد</h4>
@@ -930,7 +966,6 @@
     </div>
   </div>
 
-  <!-- Group Management Modal -->
   <div class="confirm-overlay hidden" id="group-manage-overlay">
     <div class="confirm-box">
       <h4>إدارة أعضاء المجموعة</h4>
@@ -942,18 +977,17 @@
     </div>
   </div>
 
-  <!-- Lightbox -->
   <div class="lightbox hidden" id="lightbox">
     <button class="lightbox-close" id="lightbox-close">✕</button>
     <div id="lightbox-body"></div>
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { initializeApp } from "./assets/vendor/firebase-app.js";
     import {
       getDatabase, ref, set, update, get, onValue,
       onChildAdded, onChildRemoved, push, remove, onDisconnect
-    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    } from "./assets/vendor/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAnKRhT5xJTBvsQKpW7e9w-hGSbAQJWTSo",
@@ -1004,9 +1038,7 @@
     const unreadCounts = {};
     const selectedMessageKeys = new Set();
 
-    function getRoomId(uid1, uid2) {
-      return [uid1, uid2].sort().join('_');
-    }
+    function getRoomId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
 
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, m => ({
@@ -1024,7 +1056,6 @@
       inputEl.classList.add('hidden');
       groupContainer.classList.add('hidden');
       yesBtn.classList.remove('danger');
-
       overlay.classList.remove('hidden');
 
       const noBtn = $('confirm-no');
@@ -1033,14 +1064,8 @@
         yesBtn.onclick = null;
         noBtn.onclick = null;
       };
-
-      yesBtn.onclick = () => {
-        cleanUp();
-        onYes();
-      };
-      noBtn.onclick = () => {
-        cleanUp();
-      };
+      yesBtn.onclick = () => { cleanUp(); onYes(); };
+      noBtn.onclick = cleanUp;
     }
 
     function showModal({ text, isPrompt = false, isGroupCreator = false, defaultValue = '', onYes, isDanger = false }) {
@@ -1062,7 +1087,7 @@
         inputEl.classList.remove('hidden');
         inputEl.placeholder = "اسم المجموعة...";
         inputEl.value = '';
-        
+
         const checklistEl = $('members-checklist');
         checklistEl.innerHTML = '';
         const availableMembers = { ...allUsersDirectory, ...onlineUsers };
@@ -1081,11 +1106,8 @@
         setTimeout(() => inputEl.focus(), 50);
       }
 
-      if (isDanger) {
-        yesBtn.classList.add('danger');
-      } else {
-        yesBtn.classList.remove('danger');
-      }
+      if (isDanger) yesBtn.classList.add('danger');
+      else yesBtn.classList.remove('danger');
 
       overlay.classList.remove('hidden');
 
@@ -1113,13 +1135,10 @@
 
       yesBtn.onclick = handleConfirm;
       noBtn.onclick = cleanUp;
-      
+
       if (isPrompt || isGroupCreator) {
         inputEl.onkeydown = (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            handleConfirm();
-          }
+          if (e.key === 'Enter') { e.preventDefault(); handleConfirm(); }
         };
       }
     }
@@ -1148,10 +1167,7 @@
         $('lock-name-input').focus();
         $('lock-name-btn').onclick = async () => {
           const entered = $('lock-name-input').value.trim();
-          if (!entered) {
-            alert('الرجاء إدخال اسم صحيح للمتابعة.');
-            return;
-          }
+          if (!entered) { alert('الرجاء إدخال اسم صحيح للمتابعة.'); return; }
           myName = entered;
           localStorage.setItem('vnc_name', myName);
           $('name-lock-overlay').classList.add('hidden');
@@ -1168,14 +1184,7 @@
     }
 
     async function publishIdentity() {
-      const userPayload = {
-        id: CLIENT_ID,
-        name: myName,
-        ip: myIp,
-        avatar: myAvatar,
-        lastSeen: Date.now()
-      };
-
+      const userPayload = { id: CLIENT_ID, name: myName, ip: myIp, avatar: myAvatar, lastSeen: Date.now() };
       await update(ref(db, `chat/users/${CLIENT_ID}`), userPayload);
       await set(ref(db, `chat/online/${CLIENT_ID}`), userPayload);
       onDisconnect(ref(db, `chat/online/${CLIENT_ID}`)).remove();
@@ -1188,20 +1197,15 @@
         myName = e.target.value.trim();
         localStorage.setItem('vnc_name', myName);
         updateMyAvatarDisplay();
-
         if (myName) {
           const updates = { name: myName, ip: myIp, avatar: myAvatar, lastSeen: Date.now() };
           await update(ref(db, `chat/users/${CLIENT_ID}`), updates);
           await update(ref(db, `chat/online/${CLIENT_ID}`), updates);
-
           Object.keys(savedContacts).forEach(otherId => {
             update(ref(db, `chat/user_contacts/${otherId}/${CLIENT_ID}`), {
-              name: myName,
-              ip: myIp,
-              avatar: myAvatar
+              name: myName, ip: myIp, avatar: myAvatar
             }).catch(() => {});
           });
-
           $('save-tick').classList.add('show');
           setTimeout(() => $('save-tick').classList.remove('show'), 1500);
         }
@@ -1222,7 +1226,6 @@
         myAvatar = ev.target.result;
         localStorage.setItem('vnc_avatar', myAvatar);
         updateMyAvatarDisplay();
-
         const updates = { name: myName, ip: myIp, avatar: myAvatar, lastSeen: Date.now() };
         await update(ref(db, `chat/users/${CLIENT_ID}`), updates);
         await update(ref(db, `chat/online/${CLIENT_ID}`), updates);
@@ -1248,9 +1251,7 @@
         Object.keys(val).forEach(uid => {
           if (uid !== CLIENT_ID && savedContacts[uid]) {
             const customName = localStorage.getItem(`nickname_${CLIENT_ID}_${uid}`);
-            if (!customName) {
-              savedContacts[uid].name = val[uid].name || savedContacts[uid].name;
-            }
+            if (!customName) savedContacts[uid].name = val[uid].name || savedContacts[uid].name;
             savedContacts[uid].ip = val[uid].ip || savedContacts[uid].ip;
             savedContacts[uid].avatar = val[uid].avatar || savedContacts[uid].avatar;
           }
@@ -1260,13 +1261,9 @@
           const customName = localStorage.getItem(`nickname_${CLIENT_ID}_${activeTargetId}`);
           const displayName = customName || (val[activeTargetId].name && val[activeTargetId].name.trim() !== '' ? val[activeTargetId].name : `IP: ${val[activeTargetId].ip || '—'}`);
           $('active-name').textContent = displayName;
-          
           const activeAvatarEl = $('active-avatar');
-          if (val[activeTargetId].avatar) {
-            activeAvatarEl.innerHTML = `<img src="${val[activeTargetId].avatar}">`;
-          } else {
-            activeAvatarEl.textContent = displayName.charAt(0);
-          }
+          if (val[activeTargetId].avatar) activeAvatarEl.innerHTML = `<img src="${val[activeTargetId].avatar}">`;
+          else activeAvatarEl.textContent = displayName.charAt(0);
           $('active-sub').textContent = `${onlineUsers[activeTargetId] ? 'متصل الآن' : 'غير متصل'} • IP: ${val[activeTargetId].ip || '—'}`;
         }
       });
@@ -1275,7 +1272,6 @@
         const val = snap.val() || {};
         Object.keys(savedContacts).forEach(k => delete savedContacts[k]);
         Object.assign(savedContacts, val);
-
         Object.keys(savedContacts).forEach(uid => attachUnreadWatcher(uid, 'user'));
         renderContactsList();
       });
@@ -1283,7 +1279,6 @@
       onValue(ref(db, 'chat/groups'), (snap) => {
         const groups = snap.val() || {};
         Object.keys(myGroups).forEach(k => delete myGroups[k]);
-
         Object.keys(groups).forEach(groupId => {
           const g = groups[groupId];
           if (g && g.members && g.members[CLIENT_ID]) {
@@ -1309,9 +1304,7 @@
 
         Object.values(msgs).forEach(m => {
           if (m.ts > latestTs) latestTs = m.ts;
-          if (m.sender !== CLIENT_ID && m.ts > lastRead && activeTargetId !== targetId) {
-            unread++;
-          }
+          if (m.sender !== CLIENT_ID && m.ts > lastRead && activeTargetId !== targetId) unread++;
         });
 
         unreadCounts[targetId] = unread;
@@ -1321,45 +1314,28 @@
           get(ref(db, `chat/users/${targetId}`)).then(uSnap => {
             const uData = uSnap.val() || { name: '', ip: '—', avatar: '' };
             set(ref(db, `chat/user_contacts/${CLIENT_ID}/${targetId}`), {
-              id: targetId,
-              name: uData.name || '',
-              ip: uData.ip || '—',
-              avatar: uData.avatar || '',
-              addedAt: Date.now()
+              id: targetId, name: uData.name || '', ip: uData.ip || '—', avatar: uData.avatar || '', addedAt: Date.now()
             });
           });
         }
-
         renderContactsList();
       });
     }
 
-    // Create Group with Unique Key and Admin Assignment
     $('create-group-btn').onclick = () => {
       showModal({
         text: 'إنشاء مجموعة جديدة',
         isGroupCreator: true,
         onYes: async ({ name, members }) => {
-          if (!name) {
-            alert('يجب إدخال اسم المجموعة.');
-            return;
-          }
+          if (!name) { alert('يجب إدخال اسم المجموعة.'); return; }
           members.push(CLIENT_ID);
-          
           const membersObj = {};
           members.forEach(mId => { membersObj[mId] = true; });
-
           const newGroupRef = push(ref(db, 'chat/groups'));
-          const groupId = newGroupRef.key; // Unique key for the group
-
+          const groupId = newGroupRef.key;
           const groupPayload = {
-            id: groupId,
-            name: name,
-            admin: CLIENT_ID, // Creator is the Admin
-            members: membersObj,
-            createdAt: Date.now()
+            id: groupId, name: name, admin: CLIENT_ID, members: membersObj, createdAt: Date.now()
           };
-
           await set(newGroupRef, groupPayload);
         }
       });
@@ -1368,7 +1344,6 @@
     function renderContactsList() {
       const listEl = $('contacts-list');
       const query = $('search-input').value.trim().toLowerCase();
-
       const merged = new Map();
 
       Object.keys(myGroups).forEach(gId => {
@@ -1380,9 +1355,7 @@
         if (id !== CLIENT_ID) merged.set(id, { ...savedContacts[id], isSaved: true, isGroup: false });
       });
       Object.keys(onlineUsers).forEach(id => {
-        if (id !== CLIENT_ID && !merged.has(id)) {
-          merged.set(id, { ...onlineUsers[id], isOnline: true, isGroup: false });
-        }
+        if (id !== CLIENT_ID && !merged.has(id)) merged.set(id, { ...onlineUsers[id], isOnline: true, isGroup: false });
       });
 
       const entries = Array.from(merged.values())
@@ -1406,7 +1379,6 @@
         row.className = 'contact-item' + (isActive ? ' active' : '');
 
         let displayName, avatarContent, statusLabel, ipLabel;
-
         if (isGroup) {
           displayName = item.name;
           avatarContent = `<ion-icon name="people" style="font-size:20px;"></ion-icon>`;
@@ -1456,11 +1428,8 @@
               isPrompt: true,
               defaultValue: displayName,
               onYes: (newName) => {
-                if (newName) {
-                  localStorage.setItem(`nickname_${CLIENT_ID}_${targetId}`, newName);
-                } else {
-                  localStorage.removeItem(`nickname_${CLIENT_ID}_${targetId}`);
-                }
+                if (newName) localStorage.setItem(`nickname_${CLIENT_ID}_${targetId}`, newName);
+                else localStorage.removeItem(`nickname_${CLIENT_ID}_${targetId}`);
                 renderContactsList();
                 if (activeTargetId === targetId) {
                   $('active-name').textContent = newName || (item.name ? item.name : `IP: ${item.ip}`);
@@ -1523,11 +1492,7 @@
         $('group-settings-btn').classList.remove('show');
 
         await set(ref(db, `chat/user_contacts/${CLIENT_ID}/${target.id}`), {
-          id: target.id,
-          name: target.name || '',
-          ip: target.ip || '—',
-          avatar: target.avatar || '',
-          addedAt: Date.now()
+          id: target.id, name: target.name || '', ip: target.ip || '—', avatar: target.avatar || '', addedAt: Date.now()
         });
       }
 
@@ -1546,7 +1511,6 @@
       const area = $('messages-area');
       area.innerHTML = '';
       const renderedKeys = new Set();
-
       const msgsRef = ref(db, `chat/messages/${activeRoomId}`);
 
       activeMsgListener = onChildAdded(msgsRef, (snap) => {
@@ -1566,7 +1530,6 @@
       setTimeout(() => $('msg-input').focus(), 100);
     }
 
-    // Group Settings / Member Management (Admin can remove members, any member can exit)
     $('group-settings-btn').onclick = () => {
       const group = myGroups[activeTargetId];
       if (!group) return;
@@ -1579,7 +1542,6 @@
       memberIds.forEach(mId => {
         const memberData = allUsersDirectory[mId] || onlineUsers[mId] || { name: 'مستخدم', ip: '—' };
         const mName = memberData.name ? memberData.name : `IP: ${memberData.ip}`;
-        
         const row = document.createElement('div');
         row.style.display = 'flex';
         row.style.justifyContent = 'space-between';
@@ -1598,7 +1560,6 @@
         membersListEl.appendChild(row);
       });
 
-      // Admin remove member button handlers
       if (isAdmin) {
         membersListEl.querySelectorAll('button[data-remove]').forEach(btn => {
           btn.onclick = async (e) => {
@@ -1618,10 +1579,7 @@
         });
       };
 
-      $('close-manage-btn').onclick = () => {
-        $('group-manage-overlay').classList.add('hidden');
-      };
-
+      $('close-manage-btn').onclick = () => $('group-manage-overlay').classList.add('hidden');
       $('group-manage-overlay').classList.remove('hidden');
     };
 
@@ -1746,7 +1704,7 @@
     $('batch-delete-btn').onclick = () => {
       if (!activeRoomId || selectedMessageKeys.size === 0) return;
       showSimpleConfirm(`هل تريد حذف الرسائل المحددة (${selectedMessageKeys.size})؟`, async () => {
-        const promises = Array.from(selectedMessageKeys).map(key => 
+        const promises = Array.from(selectedMessageKeys).map(key =>
           remove(ref(db, `chat/messages/${activeRoomId}/${key}`))
         );
         await Promise.all(promises);
@@ -1765,24 +1723,15 @@
       input.value = '';
       input.style.height = 'auto';
 
-      const msgRef = push(ref(db, `chat/messages/${activeRoomId}`)); // Saved under chat/messages with unique key
+      const msgRef = push(ref(db, `chat/messages/${activeRoomId}`));
       const payload = {
-        sender: CLIENT_ID,
-        senderName: myName,
-        senderIp: myIp,
-        senderAvatar: myAvatar,
-        text: text || '',
-        ts: Date.now(),
-        ...(mediaPayload || {})
+        sender: CLIENT_ID, senderName: myName, senderIp: myIp, senderAvatar: myAvatar,
+        text: text || '', ts: Date.now(), ...(mediaPayload || {})
       };
 
       if (activeType === 'user') {
         await set(ref(db, `chat/user_contacts/${activeTargetId}/${CLIENT_ID}`), {
-          id: CLIENT_ID,
-          name: myName,
-          ip: myIp,
-          avatar: myAvatar,
-          addedAt: Date.now()
+          id: CLIENT_ID, name: myName, ip: myIp, avatar: myAvatar, addedAt: Date.now()
         });
       }
 
@@ -1793,20 +1742,13 @@
     $('msg-input').addEventListener('input', function () {
       this.style.height = 'auto';
       this.style.height = Math.min(this.scrollHeight, 110) + 'px';
-      
       const hasText = this.value.trim().length > 0;
-      if (hasText) {
-        $('send-btn').classList.remove('hidden');
-      } else {
-        $('send-btn').classList.add('hidden');
-      }
+      if (hasText) $('send-btn').classList.remove('hidden');
+      else $('send-btn').classList.add('hidden');
     });
 
-    $('send-btn').onclick = () => {
-      sendMessage();
-      $('send-btn').classList.add('hidden');
-    };
-    
+    $('send-btn').onclick = () => { sendMessage(); $('send-btn').classList.add('hidden'); };
+
     $('msg-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -1829,12 +1771,7 @@
         let mediaType = 'document';
         if (file.type.startsWith('image/')) mediaType = 'image';
         else if (file.type.startsWith('video/')) mediaType = 'video';
-
-        sendMessage({
-          mediaUrl: ev.target.result,
-          mediaType,
-          fileName: file.name
-        });
+        sendMessage({ mediaUrl: ev.target.result, mediaType, fileName: file.name });
       };
       reader.readAsDataURL(file);
       e.target.value = '';
@@ -1859,9 +1796,7 @@
       emojiBar.classList.toggle('hidden');
     };
     document.addEventListener('click', (e) => {
-      if (!emojiBar.contains(e.target) && e.target.id !== 'emoji-btn') {
-        emojiBar.classList.add('hidden');
-      }
+      if (!emojiBar.contains(e.target) && e.target.id !== 'emoji-btn') emojiBar.classList.add('hidden');
     });
 
     function openLightbox(url, type) {
@@ -1876,8 +1811,12 @@
     };
 
     (async () => {
-      await initUserIdentity();
-      startDirectoryListeners();
+      try {
+        await initUserIdentity();
+        startDirectoryListeners();
+      } catch (err) {
+        window.__showBootError('init failed: ' + (err && (err.stack || err.message) || err));
+      }
     })();
   </script>
 </body>

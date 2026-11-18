@@ -31,28 +31,21 @@ jobs:
 
       - name: Verify structure
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls -la "$ANDROID_HOME" | head -5
           echo "=== Repo root ==="
           ls -la
           echo "=== capacitor.config.json webDir ==="
-          node -e "const c=require('./capacitor.config.json'); console.log('webDir =', c.webDir)" || true
+          node -e "console.log(require('./capacitor.config.json').webDir)" || true
           echo "=== android folder ==="
           ls -la android/ | head -10
 
-      - name: Ensure Capacitor webDir has index.html
+      - name: Ensure webDir has index.html
         run: |
-          WEB_DIR=$(node -e "const c=require('./capacitor.config.json'); process.stdout.write((c.webDir||'./www').replace(/^\.\//,''))")
+          WEB_DIR=$(node -e "process.stdout.write(require('./capacitor.config.json').webDir.replace(/^\.\//,''))")
           echo "Resolved webDir: $WEB_DIR"
           mkdir -p "$WEB_DIR"
 
           if [ ! -f "$WEB_DIR/index.html" ]; then
-            for SRC in \
-              "$WEB_DIR/Chat.html" \
-              "Chat/Chat.html" \
-              "Chat_APP/Chat.html" \
-              "Chat/index.html" \
-              "Chat_App/Chat.html"; do
+            for SRC in "$WEB_DIR/Chat.html" "Chat/Chat.html" "Chat_APP/Chat.html" "Chat/index.html" "Chat_App/Chat.html"; do
               if [ -f "$SRC" ]; then
                 cp "$SRC" "$WEB_DIR/index.html"
                 echo "Copied $SRC -> $WEB_DIR/index.html"
@@ -63,19 +56,50 @@ jobs:
 
           if [ ! -f "$WEB_DIR/index.html" ]; then
             echo "ERROR: could not create $WEB_DIR/index.html"
-            echo "--- html files found in repo ---"
             find . -maxdepth 3 -type f \( -name 'Chat.html' -o -name 'index.html' \) -not -path '*/node_modules/*' | head -30
             exit 1
           fi
           ls -la "$WEB_DIR"
 
-      # Must run AFTER webDir/index.html exists, because postinstall runs `cap sync`.
+      - name: Vendor Firebase + Ionicons into webDir
+        run: |
+          WEB_DIR=$(node -e "process.stdout.write(require('./capacitor.config.json').webDir.replace(/^\.\//,''))")
+          mkdir -p "$WEB_DIR/assets/vendor"
+          echo "Downloading Firebase SDK 10.14.1..."
+          curl -fsSL "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"      -o "$WEB_DIR/assets/vendor/firebase-app.js"
+          curl -fsSL "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js" -o "$WEB_DIR/assets/vendor/firebase-database.js"
+          echo "Downloading Ionicons 7.1.0..."
+          curl -fsSL "https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js" -o "$WEB_DIR/assets/vendor/ionicons.esm.js"
+          curl -fsSL "https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"     -o "$WEB_DIR/assets/vendor/ionicons.js"
+          # sanity: verify firebase-database.js uses a relative import so local copy works
+          head -3 "$WEB_DIR/assets/vendor/firebase-database.js"
+          ls -la "$WEB_DIR/assets/vendor"
+
+      # Must run AFTER index.html + vendor files exist, because postinstall runs `cap sync`.
       - name: Install npm deps
         run: npm install --no-audit --no-fund
 
-      # Optional sanity check (postinstall already ran cap sync android).
-      - name: Verify Capacitor sync
+      - name: Sync Capacitor
         run: npx cap sync android
+
+      - name: Verify web assets synced into android/
+        run: |
+          TEST_FILE="android/app/src/main/assets/public/index.html"
+          VENDOR_DIR="android/app/src/main/assets/public/assets/vendor"
+          if [ ! -s "$TEST_FILE" ]; then
+            echo "ERROR: $TEST_FILE missing or empty"
+            ls -la android/app/src/main/assets/public/ || true
+            exit 1
+          fi
+          echo "OK: index.html = $(wc -c < "$TEST_FILE") bytes"
+          for f in firebase-app.js firebase-database.js ionicons.esm.js; do
+            if [ ! -s "$VENDOR_DIR/$f" ]; then
+              echo "ERROR: missing $VENDOR_DIR/$f"
+              ls -la "$VENDOR_DIR" || true
+              exit 1
+            fi
+            echo "OK: $f = $(wc -c < "$VENDOR_DIR/$f") bytes"
+          done
 
       - name: Pin Gradle to 8.14.3
         run: |

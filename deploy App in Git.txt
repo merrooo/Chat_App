@@ -233,7 +233,7 @@ Publish Release -> ✅
 
 STEP 16 — Download the APK
 
-Browser: https://github.com/merrooo/Chat_App-AE/releases
+Browser: https://github.com/merrooo/Chat_App/releases
 
 Click Chat-v1.0.0.apk -> downloads to phone or PC.
 
