@@ -59,23 +59,10 @@ jobs:
             find . -maxdepth 3 -type f \( -name 'Chat.html' -o -name 'index.html' \) -not -path '*/node_modules/*' | head -30
             exit 1
           fi
+          echo "OK: $(wc -c < "$WEB_DIR/index.html") bytes"
           ls -la "$WEB_DIR"
 
-      - name: Vendor Firebase + Ionicons into webDir
-        run: |
-          WEB_DIR=$(node -e "process.stdout.write(require('./capacitor.config.json').webDir.replace(/^\.\//,''))")
-          mkdir -p "$WEB_DIR/assets/vendor"
-          echo "Downloading Firebase SDK 10.14.1..."
-          curl -fsSL "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"      -o "$WEB_DIR/assets/vendor/firebase-app.js"
-          curl -fsSL "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js" -o "$WEB_DIR/assets/vendor/firebase-database.js"
-          echo "Downloading Ionicons 7.1.0..."
-          curl -fsSL "https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js" -o "$WEB_DIR/assets/vendor/ionicons.esm.js"
-          curl -fsSL "https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"     -o "$WEB_DIR/assets/vendor/ionicons.js"
-          # sanity: verify firebase-database.js uses a relative import so local copy works
-          head -3 "$WEB_DIR/assets/vendor/firebase-database.js"
-          ls -la "$WEB_DIR/assets/vendor"
-
-      # Must run AFTER index.html + vendor files exist, because postinstall runs `cap sync`.
+      # postinstall runs `cap sync` — index.html must exist by now.
       - name: Install npm deps
         run: npm install --no-audit --no-fund
 
@@ -85,21 +72,12 @@ jobs:
       - name: Verify web assets synced into android/
         run: |
           TEST_FILE="android/app/src/main/assets/public/index.html"
-          VENDOR_DIR="android/app/src/main/assets/public/assets/vendor"
           if [ ! -s "$TEST_FILE" ]; then
-            echo "ERROR: $TEST_FILE missing or empty"
+            echo "ERROR: $TEST_FILE missing or empty — cap sync did not copy webDir"
             ls -la android/app/src/main/assets/public/ || true
             exit 1
           fi
-          echo "OK: index.html = $(wc -c < "$TEST_FILE") bytes"
-          for f in firebase-app.js firebase-database.js ionicons.esm.js; do
-            if [ ! -s "$VENDOR_DIR/$f" ]; then
-              echo "ERROR: missing $VENDOR_DIR/$f"
-              ls -la "$VENDOR_DIR" || true
-              exit 1
-            fi
-            echo "OK: $f = $(wc -c < "$VENDOR_DIR/$f") bytes"
-          done
+          echo "OK: $TEST_FILE = $(wc -c < "$TEST_FILE") bytes"
 
       - name: Pin Gradle to 8.14.3
         run: |
