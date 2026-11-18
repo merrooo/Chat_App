@@ -41,26 +41,12 @@ jobs:
       - name: Ensure webDir has index.html
         run: |
           WEB_DIR=$(node -e "process.stdout.write(require('./capacitor.config.json').webDir.replace(/^\.\//,''))")
-          echo "Resolved webDir: $WEB_DIR"
-          mkdir -p "$WEB_DIR"
-
-          if [ ! -f "$WEB_DIR/index.html" ]; then
-            for SRC in "$WEB_DIR/Chat.html" "Chat/Chat.html" "Chat_APP/Chat.html" "Chat/index.html" "Chat_App/Chat.html"; do
-              if [ -f "$SRC" ]; then
-                cp "$SRC" "$WEB_DIR/index.html"
-                echo "Copied $SRC -> $WEB_DIR/index.html"
-                break
-              fi
-            done
-          fi
-
-          if [ ! -f "$WEB_DIR/index.html" ]; then
-            echo "ERROR: could not create $WEB_DIR/index.html"
-            find . -maxdepth 3 -type f \( -name 'Chat.html' -o -name 'index.html' \) -not -path '*/node_modules/*' | head -30
+          if [ ! -s "$WEB_DIR/index.html" ]; then
+            echo "ERROR: $WEB_DIR/index.html is missing or empty."
+            echo "Run scripts/Configure-App.ps1 and commit the generated index.html."
             exit 1
           fi
           echo "OK: $(wc -c < "$WEB_DIR/index.html") bytes"
-          ls -la "$WEB_DIR"
 
       # postinstall runs `cap sync` — index.html must exist by now.
       - name: Install npm deps
@@ -78,16 +64,6 @@ jobs:
             exit 1
           fi
           echo "OK: $TEST_FILE = $(wc -c < "$TEST_FILE") bytes"
-
-      - name: Pin Gradle to 8.14.3
-        run: |
-          WRAPPER=android/gradle/wrapper/gradle-wrapper.properties
-          if grep -q '^distributionUrl=' "$WRAPPER"; then
-            sed -i 's#^distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip#' "$WRAPPER"
-          else
-            echo 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.3-bin.zip' >> "$WRAPPER"
-          fi
-          grep '^distributionUrl=' "$WRAPPER"
 
       - name: Decode keystore
         run: |
@@ -115,8 +91,10 @@ jobs:
       - name: Copy APK
         run: |
           mkdir -p dist
+          APP_NAME="$(node -e "process.stdout.write(require('./capacitor.config.json').appName)")"
+          SAFE_NAME="$(printf '%s' "$APP_NAME" | tr -cs 'A-Za-z0-9._-' '-')"
           SAFE_REF="${GITHUB_REF_NAME//\//-}"
-          cp android/app/build/outputs/apk/release/app-release.apk "dist/Chat-${SAFE_REF}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/${SAFE_NAME}-${SAFE_REF}.apk"
           ls -la dist/
 
       - name: Upload APK artifact

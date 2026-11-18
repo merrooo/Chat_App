@@ -1,0 +1,8 @@
+{
+  "appName": "Chat_APP",
+  "appId": "com.merrooo.Chat_APP",
+  "webDir": "Chat",
+  "entryHtml": "index.html",
+  "versionCode": 1,
+  "versionName": "1.0.0"
+}
