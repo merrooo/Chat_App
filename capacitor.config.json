@@ -1,14 +1,9 @@
 {
-    "appId": "com.merrooo.Chat_APP",
+  "appId": "com.merrooo.Chat_APP",
   "appName": "Chat_APP",
-  "webDir": "Chat_APP",
+  "webDir": "Chat",
   "bundledWebRuntime": false,
   "npmClient": "npm",
-  "plugins": {
-    "SplashScreen": {
-      "launchShowDuration": 0
-    }
-  },
   "android": {
     "allowMixedContent": true
   }
