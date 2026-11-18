@@ -1,0 +1,15 @@
+{
+    "appId": "com.merrooo.tvjcalibration",
+  "appName": "TVJ App",
+  "webDir": "TVJ",
+  "bundledWebRuntime": false,
+  "npmClient": "npm",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

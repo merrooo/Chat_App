@@ -1,0 +1,18 @@
+﻿node_modules/
+Output/
+dist/
+www/
+release.keystore
+*.keystore
+*.jks
+android/app/build/
+android/build/
+android/.gradle/
+android/app/src/main/assets/public/
+android/capacitor-cordova-android-plugins/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+deploy App in Git.txt
