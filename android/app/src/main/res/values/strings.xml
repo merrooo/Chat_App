@@ -1,7 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">TVJ App</string>
-    <string name="title_activity_main">TVJ App</string>
-    <string name="package_name">com.yourcompany.tvjapp</string>
-    <string name="custom_url_scheme">com.yourcompany.tvjapp</string>
+    <string name="app_name">Chat_APP</string>
+    <string name="title_activity_main">Chat_APP</string>
+    <string name="package_name">com.merrooo.Chat_APP</string>
+    <string name="custom_url_scheme">com.merrooo.Chat_APP</string>
 </resources>
+
+

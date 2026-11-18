@@ -81,15 +81,15 @@ jobs:
       - name: Copy APK
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk dist/TVJ-${GITHUB_REF_NAME}.apk
+          cp android/app/build/outputs/apk/release/app-release.apk dist/Chat-${GITHUB_REF_NAME}.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: APK
-          path: dist/*.apk
+          path: dist/Chat-${GITHUB_REF_NAME}.apk
 
       - name: Publish Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.apk
+          files: dist/Chat-${GITHUB_REF_NAME}.apk

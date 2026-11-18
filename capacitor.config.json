@@ -1,7 +1,7 @@
 {
-    "appId": "com.merrooo.tvjcalibration",
-  "appName": "TVJ App",
-  "webDir": "TVJ",
+    "appId": "com.merrooo.Chat_APP",
+  "appName": "Chat_APP",
+  "webDir": "Chat_APP",
   "bundledWebRuntime": false,
   "npmClient": "npm",
   "plugins": {

@@ -1,0 +1,270 @@
+PowerShell in the folder of Project:
+
+
+
+▶️ STEP 1 — Open / Set Up Chat Project Folder
+
+cd C:\Users\Admin\Desktop
+if (Test-Path "Chat_APP") { cd Chat_APP } else { Write-Host "Ensure directory C:\Users\Admin\Desktop\Chat_APP exists." }
+Get-Location
+
+Expected output:
+
+Path
+
+----
+
+C:\Users\Admin\Desktop\Chat_APP
+
+
+
+STEP 2 — Update capacitor.config.json
+
+(Get-Content capacitor.config.json) -replace '"appId": ".*?"', '"appId": "com.merrooo.Chat_APP"' -replace '"appName": ".*?"', '"appName": "Chat_APP"' | Set-Content capacitor.config.json
+Get-Content capacitor.config.json
+
+
+Expected output:
+
+{
+
+  "appId": "com.merrooo.Chat_APP",
+
+  "appName": "Chat_APP",
+
+  ...
+
+}
+
+
+
+STEP 3 — Update android\app\build.gradle
+
+(Get-Content android\app\build.gradle) -replace 'applicationId ".*?"', 'applicationId "com.merrooo.Chat_APP"' | Set-Content android\app\build.gradle
+Select-String -Path android\app\build.gradle -Pattern 'applicationId'
+
+
+Expected output:
+
+android\app\build.gradle:7:        applicationId "com.merrooo.Chat_APP"
+
+
+
+STEP 4 — Update strings.xml
+
+$p="android\app\src\main\res\values\strings.xml"; (Get-Content $p -Raw) -replace '<string name="app_name">.*?</string>', '<string name="app_name">Chat_APP</string>' -replace '<string name="title_activity_main">.*?</string>', '<string name="title_activity_main">Chat_APP</string>' -replace '<string name="package_name">.*?</string>', '<string name="package_name">com.merrooo.Chat_APP</string>' -replace '<string name="custom_url_scheme">.*?</string>', '<string name="custom_url_scheme">com.merrooo.Chat_APP</string>' | Set-Content $p
+Get-Content $p
+
+
+Expected output:
+
+<resources>
+
+    <string name="app_name">Chat_APP</string>
+
+    <string name="title_activity_main">Chat_APP</string>
+
+    <string name="package_name">com.merrooo.Chat_APP</string>
+
+    <string name="custom_url_scheme">com.merrooo.Chat_APP</string>
+
+</resources>
+
+
+
+STEP 5 — Update workflow APK filename
+
+(Get-Content .github\workflows\android-build.yml) -replace 'dist/.*?.apk', 'dist/Chat-${GITHUB_REF_NAME}.apk' | Set-Content .github\workflows\android-build.yml
+Select-String -Path .github\workflows\android-build.yml -Pattern 'dist/'
+
+
+Expected output: dist/Chat-${GITHUB_REF_NAME}.apk
+
+
+
+STEP 6 — Fresh keystore for Chat
+
+if (Test-Path "release.keystore") { Rename-Item release.keystore release.keystore.Chat.bak -Force }
+keytool -genkey -v -keystore release.keystore -alias Chat-key -keyalg RSA -keysize 2048 -validity 10000 -storepass "ChatApp2026!" -keypass "ChatApp2026!" -dname "CN=Chat, O=Chat, C=EG"
+keytool -list -keystore release.keystore -storepass "ChatApp2026!"
+
+
+Expected output:
+
+Alias name: Chat-key
+Entry type: PrivateKeyEntry
+
+
+STEP 7 — Move old keystore out of repo
+
+New-Item -ItemType Directory -Path "C:\Users\Admin\Desktop\_keystore-backups" -Force -ErrorAction SilentlyContinue
+Move-Item release.keystore.Chat.bak "C:\Users\Admin\Desktop\_keystore-backups\Chat_keystore.bak" -ErrorAction SilentlyContinue
+Get-ChildItem *.keystore* | Select-Object Name
+
+
+Expected output:
+
+Name
+----
+release.keystore
+
+
+STEP 8 — Browser Navigation
+
+Open in browser: https://github.com/merrooo/Chat_App
+
+STEP 9 — Reconnect git
+
+if (Test-Path ".git") { Remove-Item -Recurse -Force .git }
+
+git init
+git branch -M main
+git remote add origin https://github.com/merrooo/Chat_App.git
+git remote -v
+
+
+Expected output:
+
+origin  https://github.com/merrooo/Chat_App.git (fetch)
+
+origin  https://github.com/merrooo/Chat_App.git (push)
+
+
+
+STEP 10 — Copy keystore Base64
+
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\Admin\Desktop\Chat_APP\release.keystore")) | Set-Clipboard
+
+
+Expected output:
+
+Base64 string copied to clipboard automatically. Right click to paste into GitHub secret.
+
+
+STEP 11 — Add 4 secrets (browser)
+
+Browser URL: https://github.com/merrooo/Chat_App/settings/secrets/actions
+
+Settings -> Secrets and variables -> Actions -> New repository secret
+
+
+
+Name: ANDROID_KEYSTORE_BASE64     Secret: (paste clipboard)
+
+Name: ANDROID_KEYSTORE_PASSWORD   Secret: ChatApp2026!
+
+Name: ANDROID_KEY_ALIAS           Secret: Chat-key
+
+Name: ANDROID_KEY_PASSWORD       Secret: ChatApp2026!
+
+
+
+STEP 12 — Verify staging
+
+git status --short
+
+
+
+Must NOT contain: node_modules/, release.keystore, Output/
+
+
+
+STEP 13 — Ensure remote is pointed to correct repo
+
+git remote set-url origin https://github.com/merrooo/Chat_App.git
+
+git remote -v
+
+
+
+Must show:
+
+origin  https://github.com/merrooo/Chat_App.git (fetch)
+
+origin  https://github.com/merrooo/Chat_App.git (push)
+
+
+
+STEP 14 — Commit and Trigger Tag Build
+
+git add -A
+git commit -m "Deploy Chat Calibration App Release"
+git push -u origin main --force
+git tag -d v1.0.0 -ErrorAction SilentlyContinue
+git push origin :refs/tags/v1.0.0 -ErrorAction SilentlyContinue
+git tag v1.0.0
+git push origin v1.0.0
+
+
+
+STEP 15 — Watch the build
+
+Browser: https://github.com/merrooo/Chat_App-AE/actions
+
+
+
+Yellow dot = Running (~6 min)
+
+Green ✓ = Success
+
+Red ❌ = Failed
+
+
+
+Expected build sequence:
+
+Verify structure -> === Chat folder === shown ✅
+
+Install npm deps -> ✅
+
+Sync Capacitor -> Copying web assets from Chat... ✅
+
+Pin Gradle to 8.14.3 -> ✅
+
+Decode keystore -> keystore size shown ✅
+
+Build signed APK -> ~5 min ✅
+
+Copy APK -> dist/Chat-v1.0.0.apk ✅
+
+Publish Release -> ✅
+
+
+
+STEP 16 — Download the APK
+
+Browser: https://github.com/merrooo/Chat_App-AE/releases
+
+Click Chat-v1.0.0.apk -> downloads to phone or PC.
+
+
+
+STEP 17 — Install on phone
+
+1. Transfer Chat-v1.0.0.apk to phone
+
+2. Tap the APK file
+
+3. Allow install from this source if prompted
+
+4. Tap Install (App shows as "Chat Calibration" on launcher)
+
+
+
+STEP 18 — For every future Chat update
+
+git add -A
+
+git commit -m "update description"
+
+git push origin main
+
+
+
+git tag -d v1.0.1 -ErrorAction SilentlyContinue
+
+git push origin :refs/tags/v1.0.1 -ErrorAction SilentlyContinue
+
+git tag v1.0.1
+
+git push origin v1.0.1
