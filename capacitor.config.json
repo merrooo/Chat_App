@@ -2,7 +2,6 @@
     "appId":  "com.merrooo.Chat_APP",
     "appName":  "AEChat",
     "webDir":  "Chat",
-    "bundledWebRuntime":  false,
     "npmClient":  "npm",
     "plugins":  {
                     "SplashScreen":  {

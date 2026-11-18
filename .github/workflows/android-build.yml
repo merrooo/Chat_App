@@ -2,6 +2,7 @@ name: Build & Release APK
 
 on:
   push:
+    branches: [ main ]
     tags: [ 'v*' ]
   workflow_dispatch:
 
@@ -78,7 +79,9 @@ jobs:
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace \
+          APP_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT))
+          ./gradlew assembleRelease bundleRelease --stacktrace \
+            -PappVersionCode="$APP_VERSION_CODE" \
             -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/android/app/release.keystore" \
             -Pandroid.injected.signing.store.password="$KS_PASS" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
@@ -88,12 +91,13 @@ jobs:
         if: always()
         run: rm -f android/app/release.keystore
 
-      - name: Copy APK
+      - name: Copy APK and Play bundle
         run: |
           mkdir -p dist
           APP_NAME="$(node -e "process.stdout.write(require('./capacitor.config.json').appName)")"
           SAFE_NAME="$(printf '%s' "$APP_NAME" | tr -cs 'A-Za-z0-9._-' '-')"
           cp android/app/build/outputs/apk/release/app-release.apk "dist/${SAFE_NAME}.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "dist/${SAFE_NAME}.aab"
           ls -la dist/
 
       - name: Upload APK artifact
@@ -103,9 +107,32 @@ jobs:
           path: dist/*.apk
           if-no-files-found: error
 
+      - name: Upload Play bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Play-AAB
+          path: dist/*.aab
+          if-no-files-found: error
+
+      - name: Read Play publishing metadata
+        id: play-metadata
+        run: |
+          echo "package_name=$(node -e "process.stdout.write(require('./capacitor.config.json').appId)")" >> "$GITHUB_OUTPUT"
+          echo "release_name=$(node -e "process.stdout.write(require('./capacitor.config.json').appName)") build $GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to Google Play internal testing
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ steps.play-metadata.outputs.package_name }}
+          releaseFiles: dist/*.aab
+          tracks: internal
+          status: completed
+          releaseName: ${{ steps.play-metadata.outputs.release_name }}
+
       - name: Publish Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.apk
+          files: dist/*
           fail_on_unmatched_files: true

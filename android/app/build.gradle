@@ -1,18 +1,20 @@
 apply plugin: 'com.android.application'
 
+def appVersionCode = project.findProperty('appVersionCode')?.toString()?.toInteger() ?: 2
+
 android {
-    namespace "com.merrooo.Chat_APP"
-    compileSdkVersion rootProject.ext.compileSdkVersion
+    namespace = "com.merrooo.Chat_APP"
+    compileSdk = rootProject.ext.compileSdkVersion
 
     defaultConfig {
         applicationId "com.merrooo.Chat_APP"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
+        minSdk = rootProject.ext.minSdkVersion
+        targetSdk = rootProject.ext.targetSdkVersion
+        versionCode appVersionCode
         versionName "1.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
 
