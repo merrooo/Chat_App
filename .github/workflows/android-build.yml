@@ -120,6 +120,26 @@ jobs:
           echo "package_name=$(node -e "process.stdout.write(require('./capacitor.config.json').appId)")" >> "$GITHUB_OUTPUT"
           echo "release_name=$(node -e "process.stdout.write(require('./capacitor.config.json').appName)") build $GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
 
+      - name: Validate Play service-account secret
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::GitHub Secret GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is missing or unavailable to this workflow."
+            exit 1
+          fi
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" | python3 -c '
+          import json, sys
+          try:
+              credentials = json.load(sys.stdin)
+          except (json.JSONDecodeError, UnicodeDecodeError):
+              print("::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON must contain raw service-account JSON.")
+              sys.exit(1)
+          if not isinstance(credentials, dict) or credentials.get("type") != "service_account" or not credentials.get("client_email") or not credentials.get("private_key"):
+              print("::error::The Play credential JSON must include type=service_account, client_email, and private_key.")
+              sys.exit(1)
+          '
+
       - name: Publish to Google Play internal testing
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
         with:
