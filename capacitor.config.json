@@ -4,6 +4,11 @@
   "webDir": "Chat",
   "bundledWebRuntime": false,
   "npmClient": "npm",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  },
   "android": {
     "allowMixedContent": true
   }
