@@ -1,5 +1,5 @@
 {
-  "name": "TVJ App",
+  "name": "Chat App",
   "type": "custom",
   "integrations": {
     "capacitor": {}
