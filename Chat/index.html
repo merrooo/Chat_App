@@ -257,13 +257,13 @@
       color: var(--text-main); font-size: 0.78rem; font-weight: 600; margin-top: 4px;
     }
     .msg-doc ion-icon { font-size: 22px; color: var(--brand-dark); flex-shrink: 0; }
-    .msg-save-btn {
+    .msg-save-btn, .msg-open-btn {
       display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
       padding: 5px 9px; border: 1px solid var(--border); border-radius: 7px;
       background: var(--bg-panel); color: var(--text-main); font-size: 0.72rem;
       font-weight: 700; cursor: pointer;
     }
-    .msg-save-btn ion-icon { font-size: 16px; }
+    .msg-save-btn ion-icon, .msg-open-btn ion-icon { font-size: 16px; }
     .profile-avatar-column {
       display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0;
     }
@@ -1309,12 +1309,28 @@
           const doc = document.createElement('div');
           doc.className = 'msg-doc';
           doc.innerHTML = `<ion-icon name="document-text"></ion-icon><span>${escapeHtml(msg.fileName || 'مستند مرفق')}</span>`;
+          doc.tabIndex = 0;
+          doc.setAttribute('role', 'button');
+          doc.setAttribute('aria-label', `فتح ${msg.fileName || 'المرفق'}`);
+          doc.onclick = () => openAttachment(msg);
+          doc.onkeydown = (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openAttachment(msg);
+            }
+          };
           mediaWrap.appendChild(doc);
         }
+        const openButton = document.createElement('button');
+        openButton.type = 'button';
+        openButton.className = 'msg-open-btn';
+        openButton.innerHTML = '<ion-icon name="open-outline"></ion-icon><span>فتح الملف</span>';
+        openButton.onclick = () => openAttachment(msg);
+        mediaWrap.appendChild(openButton);
         const saveButton = document.createElement('button');
         saveButton.type = 'button';
         saveButton.className = 'msg-save-btn';
-        saveButton.innerHTML = '<ion-icon name="download-outline"></ion-icon><span>حفظ في التنزيلات</span>';
+        saveButton.innerHTML = '<ion-icon name="download-outline"></ion-icon><span>حفظ باسم</span>';
         saveButton.onclick = () => saveAttachment(msg);
         mediaWrap.appendChild(saveButton);
         bubble.appendChild(mediaWrap);
@@ -1486,6 +1502,16 @@
     let zipLibraryPromise = null;
     let nativeFileSaver = null;
 
+    function getNativeFileSaver() {
+      const capacitor = window.Capacitor;
+      if (!capacitor || !capacitor.getPlatform || capacitor.getPlatform() !== 'android' ||
+          !capacitor.registerPlugin) {
+        return null;
+      }
+      nativeFileSaver = nativeFileSaver || capacitor.registerPlugin('FileSaver');
+      return nativeFileSaver;
+    }
+
     function loadZipLibrary() {
       if (window.JSZip) return Promise.resolve(window.JSZip);
       if (!zipLibraryPromise) {
@@ -1528,18 +1554,16 @@
     async function saveAttachment(message) {
       const fileName = message.fileName || 'file';
       try {
-        const capacitor = window.Capacitor;
-        if (capacitor && capacitor.getPlatform && capacitor.getPlatform() === 'android' &&
-            capacitor.registerPlugin) {
-          nativeFileSaver = nativeFileSaver || capacitor.registerPlugin('FileSaver');
-          const savedFile = await nativeFileSaver.saveFile({
+        const fileSaver = getNativeFileSaver();
+        if (fileSaver) {
+          const savedFile = await fileSaver.saveFile({
             dataUrl: message.mediaUrl,
             fileName,
             mimeType: message.mimeType || ''
           });
+          if (savedFile && savedFile.cancelled) return;
           const savedName = savedFile && savedFile.fileName ? savedFile.fileName : fileName;
-          const savedLocation = savedFile && savedFile.location ? savedFile.location : 'Download';
-          showToast(`تم التحقق من حفظ ${savedName} في ${savedLocation}.`, 'success');
+          showToast(`تم حفظ ${savedName} في ${savedFile && savedFile.location ? savedFile.location : 'المجلد الذي اخترته'}.`, 'success');
           return;
         }
 
@@ -1551,7 +1575,33 @@
         link.remove();
       } catch (error) {
         console.error('Could not save attachment:', error);
-        showToast('تعذر حفظ الملف. تحقق من مساحة التخزين ثم حاول مرة أخرى.', 'error');
+        showToast('تعذر حفظ الملف في المجلد الذي اخترته.', 'error');
+      }
+    }
+
+    async function openAttachment(message) {
+      const fileName = message.fileName || 'file';
+      try {
+        const fileSaver = getNativeFileSaver();
+        if (fileSaver) {
+          await fileSaver.openFile({
+            dataUrl: message.mediaUrl,
+            fileName,
+            mimeType: message.mimeType || ''
+          });
+          return;
+        }
+
+        const link = document.createElement('a');
+        link.href = message.mediaUrl;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } catch (error) {
+        console.error('Could not open attachment:', error);
+        showToast('تعذر فتح الملف. قد لا يوجد تطبيق مناسب لهذا النوع.', 'error');
       }
     }
 

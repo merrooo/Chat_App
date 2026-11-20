@@ -1,170 +1,158 @@
 package com.merrooo.Chat_APP;
 
-import android.Manifest;
-import android.content.ContentValues;
-import android.database.Cursor;
-import android.media.MediaScannerConnection;
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
-import android.os.Environment;
-import android.provider.MediaStore;
 import android.util.Base64;
 
+import androidx.activity.result.ActivityResult;
+import androidx.core.content.FileProvider;
+
 import com.getcapacitor.JSObject;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.Permission;
-import com.getcapacitor.annotation.PermissionCallback;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URLConnection;
+import java.util.UUID;
 
-@CapacitorPlugin(
-    name = "FileSaver",
-    permissions = {
-        @Permission(alias = "storage", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE })
-    }
-)
+@CapacitorPlugin(name = "FileSaver")
 public class FileSaverPlugin extends Plugin {
     @PluginMethod
     public void saveFile(PluginCall call) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-            getPermissionState("storage") != PermissionState.GRANTED) {
-            requestPermissionForAlias("storage", call, "saveFilePermissionCallback");
-            return;
-        }
-        saveFileToDownloads(call);
-    }
-
-    @PermissionCallback
-    private void saveFilePermissionCallback(PluginCall call) {
-        if (getPermissionState("storage") != PermissionState.GRANTED) {
-            call.reject("Storage permission is required to save this file.");
-            return;
-        }
-        saveFileToDownloads(call);
-    }
-
-    private void saveFileToDownloads(PluginCall call) {
-        String dataUrl = call.getString("dataUrl");
-        String requestedName = call.getString("fileName");
-        String mimeType = call.getString("mimeType");
-        if (dataUrl == null || !dataUrl.startsWith("data:") || !dataUrl.contains(";base64,")) {
-            call.reject("The attachment data is invalid.");
-            return;
-        }
-
-        int separator = dataUrl.indexOf(',');
-        String fileName = sanitizeFileName(requestedName);
-        String encodedData = dataUrl.substring(separator + 1);
-        String dataMimeType = dataUrl.substring("data:".length(), dataUrl.indexOf(";base64,"));
-        byte[] fileData;
+        String fileName = sanitizeFileName(call.getString("fileName"));
         try {
-            fileData = Base64.decode(encodedData, Base64.DEFAULT);
-        } catch (IllegalArgumentException exception) {
-            call.reject("The attachment data could not be decoded.", exception);
+            decodeAttachment(call.getString("dataUrl"));
+        } catch (IOException exception) {
+            call.reject("The attachment data is invalid.", exception);
             return;
         }
 
-        if (mimeType == null || mimeType.isEmpty()) {
-            mimeType = dataMimeType.isEmpty() ? "application/octet-stream" : dataMimeType;
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            saveWithMediaStore(call, fileName, mimeType, fileData);
-        } else {
-            saveWithLegacyStorage(call, fileName, mimeType, fileData);
-        }
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType(resolveMimeType(call, fileName));
+        intent.putExtra(Intent.EXTRA_TITLE, fileName);
+        startActivityForResult(call, intent, "saveFileResult");
     }
 
-    private void saveWithMediaStore(PluginCall call, String fileName, String mimeType, byte[] fileData) {
-        Uri fileUri = null;
+    @ActivityCallback
+    private void saveFileResult(PluginCall call, ActivityResult result) {
+        if (call == null) {
+            return;
+        }
+        if (result == null || result.getResultCode() != Activity.RESULT_OK ||
+            result.getData() == null || result.getData().getData() == null) {
+            JSObject cancelled = new JSObject();
+            cancelled.put("cancelled", true);
+            call.resolve(cancelled);
+            return;
+        }
+
+        String fileName = sanitizeFileName(call.getString("fileName"));
+        Uri destination = result.getData().getData();
         try {
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
-            values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
-            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
-            values.put(MediaStore.MediaColumns.IS_PENDING, 1);
-
-            fileUri = getContext().getContentResolver().insert(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                values
-            );
-            if (fileUri == null) {
-                call.reject("Android could not create the file in Downloads.");
-                return;
-            }
-
-            try (OutputStream output = getContext().getContentResolver().openOutputStream(fileUri)) {
+            byte[] fileData = decodeAttachment(call.getString("dataUrl"));
+            try (OutputStream output = getContext().getContentResolver().openOutputStream(destination, "w")) {
                 if (output == null) {
-                    throw new IOException("Could not open the Downloads file.");
+                    throw new IOException("Could not open the selected destination.");
                 }
                 output.write(fileData);
             }
 
-            ContentValues completed = new ContentValues();
-            completed.put(MediaStore.MediaColumns.IS_PENDING, 0);
-            int updatedRows = getContext().getContentResolver().update(fileUri, completed, null, null);
-            if (updatedRows == 0) {
-                throw new IOException("Android could not publish the file in Downloads.");
-            }
-            verifyPublishedFile(fileUri, fileData.length);
-            resolveSavedFile(call, fileName);
+            JSObject saved = new JSObject();
+            saved.put("fileName", fileName);
+            saved.put("location", "المجلد الذي اخترته");
+            call.resolve(saved);
         } catch (IOException | RuntimeException exception) {
-            if (fileUri != null) {
-                getContext().getContentResolver().delete(fileUri, null, null);
-            }
-            call.reject("Could not save the file to Downloads.", exception);
+            call.reject("Could not save the file to the selected location.", exception);
         }
     }
 
-    @SuppressWarnings("deprecation")
-    private void saveWithLegacyStorage(PluginCall call, String fileName, String mimeType, byte[] fileData) {
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if ((!downloads.exists() && !downloads.mkdirs()) || !downloads.isDirectory()) {
-            call.reject("Could not access the Downloads folder.");
-            return;
-        }
-
-        File destination = uniqueFile(downloads, fileName);
-        try (FileOutputStream output = new FileOutputStream(destination)) {
-            output.write(fileData);
-        } catch (IOException exception) {
-            if (destination.exists()) {
-                destination.delete();
+    @PluginMethod
+    public void openFile(PluginCall call) {
+        String fileName = sanitizeFileName(call.getString("fileName"));
+        try {
+            byte[] fileData = decodeAttachment(call.getString("dataUrl"));
+            File attachmentDirectory = new File(getContext().getCacheDir(), "chat-attachments");
+            if ((!attachmentDirectory.exists() && !attachmentDirectory.mkdirs()) ||
+                !attachmentDirectory.isDirectory()) {
+                throw new IOException("Could not create the temporary attachment directory.");
             }
-            call.reject("Could not save the file to Downloads.", exception);
-            return;
-        }
 
-        MediaScannerConnection.scanFile(
-            getContext(),
-            new String[] { destination.getAbsolutePath() },
-            new String[] { mimeType },
-            null
-        );
-        resolveSavedFile(call, destination.getName());
+            File temporaryFile = new File(
+                attachmentDirectory,
+                UUID.randomUUID() + "-" + fileName
+            );
+            try (FileOutputStream output = new FileOutputStream(temporaryFile)) {
+                output.write(fileData);
+            }
+
+            Uri contentUri = FileProvider.getUriForFile(
+                getContext(),
+                getContext().getPackageName() + ".fileprovider",
+                temporaryFile
+            );
+            Intent viewIntent = new Intent(Intent.ACTION_VIEW);
+            viewIntent.setDataAndType(contentUri, resolveOpenMimeType(call, fileName));
+            viewIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            getActivity().startActivity(Intent.createChooser(viewIntent, "فتح الملف باستخدام"));
+
+            JSObject opened = new JSObject();
+            opened.put("fileName", fileName);
+            call.resolve(opened);
+        } catch (ActivityNotFoundException exception) {
+            call.reject("No application can open this file type.", exception);
+        } catch (IOException | RuntimeException exception) {
+            call.reject("Could not open the attachment.", exception);
+        }
     }
 
-    private File uniqueFile(File directory, String fileName) {
-        File destination = new File(directory, fileName);
-        if (!destination.exists()) {
-            return destination;
+    private byte[] decodeAttachment(String dataUrl) throws IOException {
+        String marker = ";base64,";
+        int separator = dataUrl == null ? -1 : dataUrl.indexOf(marker);
+        if (dataUrl == null || !dataUrl.startsWith("data:") || separator < 0) {
+            throw new IOException("The attachment data is not a Base64 data URL.");
+        }
+        try {
+            return Base64.decode(dataUrl.substring(separator + marker.length()), Base64.DEFAULT);
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("The attachment data could not be decoded.", exception);
+        }
+    }
+
+    private String resolveMimeType(PluginCall call, String fileName) {
+        String mimeType = call.getString("mimeType");
+        if (mimeType != null && !mimeType.trim().isEmpty() &&
+            !"application/octet-stream".equalsIgnoreCase(mimeType)) {
+            return mimeType;
         }
 
-        int extensionIndex = fileName.lastIndexOf('.');
-        String baseName = extensionIndex > 0 ? fileName.substring(0, extensionIndex) : fileName;
-        String extension = extensionIndex > 0 ? fileName.substring(extensionIndex) : "";
-        int suffix = 1;
-        do {
-            destination = new File(directory, baseName + " (" + suffix++ + ")" + extension);
-        } while (destination.exists());
-        return destination;
+        String dataUrl = call.getString("dataUrl");
+        if (dataUrl != null && dataUrl.startsWith("data:")) {
+            int separator = dataUrl.indexOf(';');
+            if (separator > "data:".length()) {
+                String dataMimeType = dataUrl.substring("data:".length(), separator);
+                if (dataMimeType.contains("/") &&
+                    !"application/octet-stream".equalsIgnoreCase(dataMimeType)) {
+                    return dataMimeType;
+                }
+            }
+        }
+
+        String guessedMimeType = URLConnection.guessContentTypeFromName(fileName);
+        return guessedMimeType == null ? "*/*" : guessedMimeType;
+    }
+
+    private String resolveOpenMimeType(PluginCall call, String fileName) {
+        String mimeType = resolveMimeType(call, fileName);
+        return "application/octet-stream".equalsIgnoreCase(mimeType) ? "*/*" : mimeType;
     }
 
     private String sanitizeFileName(String fileName) {
@@ -175,30 +163,5 @@ public class FileSaverPlugin extends Plugin {
         return sanitized.isEmpty() || ".".equals(sanitized) || "..".equals(sanitized)
             ? "file"
             : sanitized;
-    }
-
-    private void resolveSavedFile(PluginCall call, String fileName) {
-        JSObject result = new JSObject();
-        result.put("fileName", fileName);
-        result.put("location", Environment.DIRECTORY_DOWNLOADS + "/" + fileName);
-        call.resolve(result);
-    }
-
-    private void verifyPublishedFile(Uri fileUri, int expectedSize) throws IOException {
-        String[] columns = {
-            MediaStore.MediaColumns.IS_PENDING,
-            MediaStore.MediaColumns.SIZE
-        };
-        try (Cursor cursor = getContext().getContentResolver().query(fileUri, columns, null, null, null)) {
-            if (cursor == null || !cursor.moveToFirst()) {
-                throw new IOException("Android could not find the saved file in Downloads.");
-            }
-
-            int pendingIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.IS_PENDING);
-            int sizeIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE);
-            if (cursor.getInt(pendingIndex) != 0 || cursor.getLong(sizeIndex) != expectedSize) {
-                throw new IOException("Android did not make the complete file visible in Downloads.");
-            }
-        }
     }
 }
