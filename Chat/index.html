@@ -257,13 +257,13 @@
       color: var(--text-main); font-size: 0.78rem; font-weight: 600; margin-top: 4px;
     }
     .msg-doc ion-icon { font-size: 22px; color: var(--brand-dark); flex-shrink: 0; }
-    .msg-save-btn, .msg-open-btn {
+    .msg-save-btn {
       display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
       padding: 5px 9px; border: 1px solid var(--border); border-radius: 7px;
       background: var(--bg-panel); color: var(--text-main); font-size: 0.72rem;
       font-weight: 700; cursor: pointer;
     }
-    .msg-save-btn ion-icon, .msg-open-btn ion-icon { font-size: 16px; }
+    .msg-save-btn ion-icon { font-size: 16px; }
     .profile-avatar-column {
       display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0;
     }
@@ -1321,16 +1321,10 @@
           };
           mediaWrap.appendChild(doc);
         }
-        const openButton = document.createElement('button');
-        openButton.type = 'button';
-        openButton.className = 'msg-open-btn';
-        openButton.innerHTML = '<ion-icon name="open-outline"></ion-icon><span>فتح الملف</span>';
-        openButton.onclick = () => openAttachment(msg);
-        mediaWrap.appendChild(openButton);
         const saveButton = document.createElement('button');
         saveButton.type = 'button';
         saveButton.className = 'msg-save-btn';
-        saveButton.innerHTML = '<ion-icon name="download-outline"></ion-icon><span>حفظ باسم</span>';
+        saveButton.innerHTML = '<ion-icon name="download-outline"></ion-icon><span>تنزيل الملف</span>';
         saveButton.onclick = () => saveAttachment(msg);
         mediaWrap.appendChild(saveButton);
         bubble.appendChild(mediaWrap);
