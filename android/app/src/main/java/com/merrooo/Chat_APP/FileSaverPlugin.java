@@ -108,7 +108,10 @@ public class FileSaverPlugin extends Plugin {
 
             ContentValues completed = new ContentValues();
             completed.put(MediaStore.MediaColumns.IS_PENDING, 0);
-            getContext().getContentResolver().update(fileUri, completed, null, null);
+            int updatedRows = getContext().getContentResolver().update(fileUri, completed, null, null);
+            if (updatedRows == 0) {
+                throw new IOException("Android could not publish the file in Downloads.");
+            }
             resolveSavedFile(call, fileName);
         } catch (IOException | RuntimeException exception) {
             if (fileUri != null) {
