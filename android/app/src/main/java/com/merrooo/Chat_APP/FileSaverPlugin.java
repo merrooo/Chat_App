@@ -2,6 +2,7 @@ package com.merrooo.Chat_APP;
 
 import android.Manifest;
 import android.content.ContentValues;
+import android.database.Cursor;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
@@ -112,6 +113,7 @@ public class FileSaverPlugin extends Plugin {
             if (updatedRows == 0) {
                 throw new IOException("Android could not publish the file in Downloads.");
             }
+            verifyPublishedFile(fileUri, fileData.length);
             resolveSavedFile(call, fileName);
         } catch (IOException | RuntimeException exception) {
             if (fileUri != null) {
@@ -178,7 +180,25 @@ public class FileSaverPlugin extends Plugin {
     private void resolveSavedFile(PluginCall call, String fileName) {
         JSObject result = new JSObject();
         result.put("fileName", fileName);
-        result.put("location", "Downloads");
+        result.put("location", Environment.DIRECTORY_DOWNLOADS + "/" + fileName);
         call.resolve(result);
+    }
+
+    private void verifyPublishedFile(Uri fileUri, int expectedSize) throws IOException {
+        String[] columns = {
+            MediaStore.MediaColumns.IS_PENDING,
+            MediaStore.MediaColumns.SIZE
+        };
+        try (Cursor cursor = getContext().getContentResolver().query(fileUri, columns, null, null, null)) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                throw new IOException("Android could not find the saved file in Downloads.");
+            }
+
+            int pendingIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.IS_PENDING);
+            int sizeIndex = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE);
+            if (cursor.getInt(pendingIndex) != 0 || cursor.getLong(sizeIndex) != expectedSize) {
+                throw new IOException("Android did not make the complete file visible in Downloads.");
+            }
+        }
     }
 }

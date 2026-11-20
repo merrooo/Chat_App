@@ -1532,12 +1532,14 @@
         if (capacitor && capacitor.getPlatform && capacitor.getPlatform() === 'android' &&
             capacitor.registerPlugin) {
           nativeFileSaver = nativeFileSaver || capacitor.registerPlugin('FileSaver');
-          await nativeFileSaver.saveFile({
+          const savedFile = await nativeFileSaver.saveFile({
             dataUrl: message.mediaUrl,
             fileName,
             mimeType: message.mimeType || ''
           });
-          showToast('تم حفظ الملف في مجلد التنزيلات.', 'success');
+          const savedName = savedFile && savedFile.fileName ? savedFile.fileName : fileName;
+          const savedLocation = savedFile && savedFile.location ? savedFile.location : 'Download';
+          showToast(`تم التحقق من حفظ ${savedName} في ${savedLocation}.`, 'success');
           return;
         }
 
